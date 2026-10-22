@@ -1,0 +1,1508 @@
+<title>birdcrab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Comic+Neue:ital,wght@0,400;0,700;1,400&display=swap">
+<style>
+/* layout: weathercrab's phone-width column — header, the crab birdwatching on a soft glow, the bird's name and field note,
+   a countdown to the next bird, one pill button. single dark theme on purpose: a night-time marker sketch. */
+:root {
+  color-scheme: dark;
+  --bg: #1b1918;
+  --ink: #efe9e1;
+  --muted: #a8a097;
+  --faint: #6f6861;
+  --chip: #2c2927;
+  --chip-hover: #37332f;
+  --sheet: #232120;
+  --line: #3a3633;
+  --scrim: rgba(0, 0, 0, .5);
+  --focus: #8fb3d9;
+  --tip: #9fd08a;
+  --glow-o: .5;
+  --font: "Comic Neue", "Comic Sans MS", "Chalkboard SE", "Comic Sans", cursive;
+}
+[hidden] { display: none !important; }
+@property --glow { syntax: "<color>"; inherits: true; initial-value: #6fb25d; }
+
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 10px; }
+
+.app {
+  position: relative;
+  min-height: 100%;
+  max-width: 430px;
+  margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+/* header */
+.top { display: grid; grid-template-columns: minmax(32px, 1fr) minmax(0, auto) minmax(max-content, 1fr); align-items: center; gap: 6px; height: 46px; flex: none; }
+.top-left { justify-self: start; display: flex; gap: 6px; }
+.round {
+  width: 32px; height: 32px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--chip); color: var(--muted);
+  font-size: 13px; font-weight: 700;
+  transition: background-color .2s, color .2s, opacity .2s;
+}
+.round:hover { background: var(--chip-hover); color: var(--ink); }
+.round svg { width: 15px; height: 15px; }
+.round[disabled] { opacity: .3; pointer-events: none; }
+.install { position: relative; background: #ffffff; }
+.install:hover { background: #ffffff; box-shadow: 0 0 0 2px var(--chip-hover); }
+.round .app-glyph { width: 28px; height: 24px; }
+.install .badge {
+  position: absolute; right: -3px; bottom: -3px;
+  width: 14px; height: 14px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: #2b2522; color: #ffffff; box-shadow: 0 0 0 2px var(--bg);
+  font-size: 12px; font-weight: 700; line-height: 1;
+}
+.when {
+  justify-self: center;
+  display: inline-flex; flex-direction: column; align-items: center;
+  font-weight: 700; font-size: 17px; color: var(--muted);
+  padding: 4px 8px; border-radius: 12px;
+  max-width: 100%; min-width: 0;
+}
+.when:hover { color: var(--ink); }
+.when-line { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; }
+.when-line span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.when .chev { width: 11px; height: 11px; flex: none; }
+.when .sub { font-size: 12px; font-weight: 400; line-height: 14px; }
+.units { justify-self: end; display: flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--chip); }
+.units button { font-size: 12px; font-weight: 700; line-height: 1; color: var(--muted); padding: 6px 8px; border-radius: 999px; transition: background-color .2s, color .2s; }
+.units button:hover { color: var(--ink); }
+.units button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+
+/* stage */
+.main { position: relative; flex: 1; display: flex; flex-direction: column; justify-content: center; }
+.stage { position: relative; flex: 1 1 0; min-height: 170px; max-height: 300px; display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; container-type: size; }
+.glow, .fx {
+  position: absolute; left: 50%; top: 50%;
+  width: min(100cqw, 133cqh); aspect-ratio: 4 / 3;
+  translate: -50% -50%;
+}
+.glow {
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--glow) 0%, var(--glow) 40%, color-mix(in srgb, var(--glow) 0%, transparent) 100%);
+  filter: blur(6px);
+  opacity: var(--glow-o);
+  transition: --glow .8s ease;
+}
+.fx { pointer-events: none; z-index: 2; }
+.scene-stack { position: relative; width: min(100cqw, 130cqh); aspect-ratio: 4 / 3; }
+.holder { position: absolute; inset: 0; opacity: 0; transform: translateY(6px) scale(.97); transition: opacity .38s ease, transform .38s ease; }
+.holder.on { opacity: 1; transform: none; }
+.holder svg { width: 100%; height: 100%; display: block; overflow: visible; }
+
+/* crab idle motion, from weathercrab */
+.holder .crab .eyes { transform-box: fill-box; transform-origin: center; animation: blink 5.5s infinite; }
+.holder .crab .breathe, .holder .crab .move { transform-box: fill-box; transform-origin: 50% 100%; }
+.holder .crab .breathe { animation: breathe 3.4s ease-in-out infinite; }
+.holder .crab[data-move="sway"] .move { animation: sway 3.4s ease-in-out infinite alternate; }
+.holder .crab[data-move="hop"] .move { animation: hop 1.9s ease-in-out 3; }
+.holder .crab .bino { transform-box: fill-box; transform-origin: 50% 50%; animation: peek 6s ease-in-out infinite; }
+
+/* bird motion, by kind */
+.holder .bird .beye { transform-box: fill-box; transform-origin: center; animation: blink 4.6s infinite; }
+.holder .bird .bmove { transform-box: fill-box; transform-origin: 50% 100%; }
+.holder .bird[data-move="bob"] .bmove { animation: bob 2.2s ease-in-out infinite; }
+.holder .bird[data-move="float"] .bmove { animation: float 3.2s ease-in-out infinite; }
+.holder .bird[data-move="hover"] .bmove { animation: hover 1.4s ease-in-out infinite; }
+.holder .bird[data-move="sway"] .bmove { animation: sway 4.2s ease-in-out infinite alternate; }
+.holder .bird[data-move="peck"] .bmove { animation: peck 3.6s ease-in-out infinite; }
+.holder .bird[data-move="still"] .bmove { animation: breathe 3.8s ease-in-out infinite; }
+.holder .bird .blur { transform-box: fill-box; transform-origin: 50% 100%; animation: flutter .09s linear infinite alternate; }
+.holder .bird .land { transform-box: fill-box; transform-origin: 50% 100%; animation: land .5s cubic-bezier(.3, 1.5, .5, 1) both; }
+.holder .ripple { transform-box: fill-box; transform-origin: center; animation: ripple 3s ease-out infinite; }
+.holder .ripple.r2 { animation-delay: -1.5s; }
+
+@keyframes blink { 0%, 93%, 100% { transform: scaleY(1); } 95% { transform: scaleY(.12); } }
+@keyframes breathe { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(1.02); } }
+@keyframes sway { from { transform: rotate(-1.6deg); } to { transform: rotate(1.6deg); } }
+@keyframes hop { 0%, 55%, 100% { transform: translateY(0) scale(1, 1); } 8% { transform: translateY(0) scale(1.04, .93); } 22% { transform: translateY(-14px) scale(.97, 1.05); } 36% { transform: translateY(0) scale(1.05, .93); } 46% { transform: none; } }
+@keyframes peek { 0%, 70%, 100% { transform: none; } 76%, 90% { transform: translateY(-3px) rotate(-4deg); } }
+@keyframes bob { 0%, 60%, 100% { transform: none; } 70% { transform: translateY(-2px) rotate(-2deg); } 80% { transform: none; } 88% { transform: translateY(-1.5px) rotate(1.5deg); } }
+@keyframes float { 0%, 100% { transform: translateY(0) rotate(-.6deg); } 50% { transform: translateY(2px) rotate(.6deg); } }
+@keyframes hover { 0%, 100% { transform: translate(0, 0); } 30% { transform: translate(-2px, -4px); } 65% { transform: translate(1px, 2px); } }
+@keyframes peck { 0%, 62%, 82%, 100% { transform: none; } 68%, 76% { transform: rotate(-9deg); } 72% { transform: rotate(-4deg); } }
+@keyframes flutter { from { transform: scaleY(1); } to { transform: scaleY(-.35); } }
+@keyframes land { from { transform: translateY(-30px) scale(.8); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes ripple { 0% { transform: scale(.4); opacity: 0; } 20% { opacity: .7; } 100% { transform: scale(1.6); opacity: 0; } }
+
+/* the bird: name, where it lives, how big */
+.who { display: grid; grid-template-columns: 32px minmax(0, 1fr) 32px; align-items: center; gap: 8px; flex: none; margin-top: 4px; }
+.who-text { text-align: center; min-width: 0; }
+.bird-name { font-weight: 700; font-size: 26px; line-height: 31px; text-wrap: balance; }
+.sci { font-style: italic; font-size: 13px; line-height: 17px; color: var(--muted); margin-top: 1px; }
+.chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 10px; flex: none; }
+.chip {
+  display: inline-flex; align-items: center; gap: 5px; min-width: 0; max-width: 100%;
+  padding: 4px 11px 4px 8px; border-radius: 999px;
+  background: var(--chip); color: var(--ink); font-size: 13px; font-weight: 700;
+}
+.chip svg { width: 13px; height: 13px; flex: none; color: var(--muted); }
+.chip span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chip .dim { color: var(--muted); font-weight: 400; }
+
+/* the bird's own voice */
+.listen { display: flex; justify-content: center; margin-top: 10px; flex: none; min-height: 34px; }
+.play {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 7px 16px 7px 8px; border-radius: 999px;
+  color: var(--ink); font-size: 14px; font-weight: 700;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--glow) 42%, var(--chip)) var(--p, 0%), var(--chip) var(--p, 0%));
+  transition: box-shadow .2s;
+}
+.play:hover { box-shadow: inset 0 0 0 1.5px var(--faint); }
+.play .pi { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: var(--bg); flex: none; }
+.play .pi svg { width: 10px; height: 10px; }
+.play .dim { color: var(--muted); font-weight: 400; font-size: 12px; font-variant-numeric: tabular-nums; }
+.play .bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 12px; }
+.play .bars i { width: 3px; border-radius: 2px; background: var(--ink); animation: eq .7s ease-in-out infinite alternate; }
+.play .bars i:nth-child(2) { animation-delay: -.25s; } .play .bars i:nth-child(3) { animation-delay: -.5s; }
+@keyframes eq { from { height: 3px; } to { height: 12px; } }
+.quiet { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 999px; background: var(--chip); color: var(--muted); font-size: 13px; }
+.quiet svg { width: 14px; height: 14px; }
+.credit { margin: 6px auto 0; max-width: 360px; font-size: 11px; line-height: 15px; color: var(--faint); text-wrap: balance; }
+.credit a { color: var(--muted); text-underline-offset: 2px; }
+.stage.singing .holder .bird .bmove { animation: sing .42s ease-in-out infinite alternate; }
+@keyframes sing { from { transform: rotate(-1.6deg); } to { transform: rotate(1.6deg) translateY(-2px); } }
+
+/* the field note */
+.fact { margin-top: 12px; flex: none; text-align: center; padding-inline: 6px; }
+.fact-label { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: .08em; color: var(--tip); }
+.fact-label svg { width: 13px; height: 13px; }
+.fact p { margin: 4px auto 0; max-width: 360px; font-size: 16px; line-height: 22px; min-height: 66px; text-wrap: pretty; }
+
+/* the countdown */
+.timer {
+  align-self: center; flex: none;
+  display: flex; align-items: center; gap: 12px;
+  margin-top: 6px; padding: 8px 18px 8px 10px; border-radius: 22px;
+  background: var(--chip);
+}
+.ring { width: 46px; height: 46px; flex: none; }
+.ring .track-c { stroke: var(--line); }
+.ring .fill-c { stroke: var(--glow); transition: stroke-dashoffset 1s linear, stroke .8s ease; }
+.ring .dot { fill: var(--ink); }
+.timer-text { display: flex; flex-direction: column; min-width: 0; }
+.timer-label { font-size: 12px; line-height: 15px; color: var(--muted); white-space: nowrap; }
+.count { font-size: 30px; line-height: 34px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: .01em; }
+.count .u { font-size: 15px; color: var(--muted); margin: 0 4px 0 1px; }
+
+.more { align-self: center; margin-top: 12px; white-space: nowrap; flex: none; }
+.foot { display: flex; justify-content: center; padding-top: 10px; flex: none; }
+.pill {
+  background: var(--chip); color: var(--muted);
+  font-weight: 700; font-size: 13px;
+  padding: 10px 22px; border-radius: 999px;
+  transition: background-color .2s, color .2s;
+}
+.pill:hover { background: var(--chip-hover); color: var(--ink); }
+.note { font-size: 11px; line-height: 15px; color: var(--faint); margin: 0; min-height: 15px; text-align: center; text-wrap: balance; }
+.note button { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; font-size: 11px; }
+.note button:hover { color: var(--ink); }
+
+/* sheets, from weathercrab */
+.sheet-wrap { position: fixed; inset: 0; z-index: 10; display: flex; align-items: flex-end; justify-content: center; }
+.backdrop { position: absolute; inset: 0; background: var(--scrim); opacity: 0; transition: opacity .25s ease; }
+.sheet {
+  position: relative;
+  width: 100%; max-width: 430px; max-height: 84%;
+  box-sizing: border-box;
+  background: var(--sheet);
+  border-radius: 26px 26px 0 0;
+  padding-left: max(18px, env(safe-area-inset-left, 0px));
+  padding-right: max(18px, env(safe-area-inset-right, 0px));
+  padding-block: 14px calc(18px + env(safe-area-inset-bottom, 0px));
+  display: flex; flex-direction: column; gap: 12px;
+  transform: translateY(104%);
+  transition: transform .32s cubic-bezier(.2, .8, .2, 1);
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, .45);
+}
+.sheet-wrap.open .backdrop { opacity: 1; }
+.sheet-wrap.open .sheet { transform: none; }
+.grab { width: 38px; height: 4px; border-radius: 4px; background: var(--line); align-self: center; flex: none; }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex: none; }
+.sheet-head h2 { margin: 0; font-size: 18px; font-weight: 700; min-width: 0; }
+.sheet-sub { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 6px; }
+.sheet-note { font-size: 12px; color: var(--muted); margin: 0; text-align: center; flex: none; text-wrap: pretty; }
+#logSheet .sheet { height: 84%; }
+
+.life { display: flex; align-items: center; gap: 10px; flex: none; font-size: 13px; color: var(--muted); }
+.life b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.bar { flex: 1; height: 6px; border-radius: 6px; background: var(--chip); overflow: hidden; }
+.bar i { display: block; height: 100%; border-radius: 6px; background: var(--tip); }
+.log { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 4px; overflow-y: auto; min-height: 0; align-content: start; }
+.log-card { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 6px 4px 9px; border-radius: 14px; text-align: center; }
+.log-card:hover, .log-card.sel { background: var(--chip); }
+.log-card.sel { box-shadow: inset 0 0 0 1.5px var(--faint); }
+.log-card .mini { width: 100%; aspect-ratio: 184 / 202; margin-bottom: 2px; }
+.log-card .mini svg { width: 100%; height: 100%; display: block; }
+.log-card .lw { font-size: 11px; line-height: 14px; font-weight: 700; color: var(--muted); }
+.log-card .lw.now { color: var(--tip); }
+.log-card b { font-size: 12.5px; line-height: 15px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.log-card small { font-size: 11px; line-height: 14px; color: var(--faint); }
+.log-card small.got { color: var(--tip); }
+.log-card.next { cursor: default; border: 1.5px dashed var(--line); }
+.log-card.next:hover { background: none; }
+.log-card.next .count-s { font-size: 12px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+.how { overflow-y: auto; min-height: 0; display: flex; flex-direction: column; gap: 12px; padding-bottom: 4px; }
+.how p { margin: 0; font-size: 14px; line-height: 21px; color: var(--muted); text-wrap: pretty; }
+.how b { color: var(--ink); }
+
+.install-app { display: flex; align-items: center; gap: 14px; padding: 4px 2px; flex: none; }
+.install-app .icon { width: 60px; height: 60px; flex: none; border-radius: 14px; background: #ffffff; display: grid; place-items: center; overflow: hidden; }
+.install-app .icon svg { width: 86%; height: 86%; }
+.install-app b { display: block; font-size: 16px; }
+.install-app small { font-size: 13px; color: var(--muted); }
+.steps { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; counter-reset: step; }
+.steps li { counter-increment: step; display: flex; align-items: center; gap: 12px; font-size: 15px; line-height: 1.35; }
+.steps li::before { content: counter(step); flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--chip); color: var(--ink); font-weight: 700; font-size: 13px; }
+.steps .ic { display: inline-grid; place-items: center; vertical-align: -4px; width: 22px; height: 22px; border-radius: 6px; background: var(--chip); margin-inline: 2px; }
+.steps .ic svg { width: 14px; height: 14px; }
+
+@media (max-height: 760px) { .fact p { font-size: 15px; line-height: 20px; min-height: 60px; } .bird-name { font-size: 23px; line-height: 28px; } .count { font-size: 26px; line-height: 30px; } }
+@media (prefers-reduced-motion: reduce) {
+  .holder *, .play .bars i { animation: none !important; }
+  .holder, .sheet, .backdrop, .glow, .ring .fill-c { transition: none; }
+}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <filter id="wob" filterUnits="userSpaceOnUse" x="-40" y="-60" width="340" height="310">
+      <feTurbulence type="fractalNoise" baseFrequency="0.022" numOctaves="1" seed="7" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="2.2" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="wobS" filterUnits="userSpaceOnUse" x="-20" y="-20" width="360" height="290">
+      <feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="1" seed="3" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="1.6" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="wobB" filterUnits="userSpaceOnUse" x="-170" y="-280" width="380" height="320">
+      <feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="1" seed="5" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="1.6" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+</svg>
+
+<main class="app" id="app">
+  <header class="top">
+    <div class="top-left">
+      <button class="round" id="howBtn" aria-haspopup="dialog" aria-label="how birdcrab works" title="how birdcrab works">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.6" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M6.2 6.3a1.9 1.9 0 1 1 2.6 1.8c-.6.3-.8.7-.8 1.3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="8" cy="11.6" r="1" fill="currentColor"/></svg>
+      </button>
+      <button class="round install" id="installBtn" aria-haspopup="dialog" aria-label="add birdcrab to your home screen" title="add to home screen">
+        <span id="installGlyph"></span>
+        <span class="badge" aria-hidden="true">+</span>
+      </button>
+    </div>
+    <button class="when" id="whenBtn" aria-haspopup="dialog">
+      <span class="when-line">
+        <span id="whenDay">today</span>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      </span>
+      <span class="sub" id="whenSlot">(morning bird)</span>
+    </button>
+    <div class="units" role="group" aria-label="size unit">
+      <button id="unitIn" aria-pressed="true" aria-label="inches">in</button>
+      <button id="unitCm" aria-pressed="false" aria-label="centimeters">cm</button>
+    </div>
+  </header>
+
+  <section class="main" aria-label="this half-day's bird">
+    <div class="stage" aria-hidden="true">
+      <div class="glow" id="glow"></div>
+      <div class="scene-stack">
+        <div class="holder on" id="holderA"></div>
+        <div class="holder" id="holderB"></div>
+      </div>
+      <canvas class="fx" id="fx"></canvas>
+    </div>
+
+    <div class="who">
+      <button class="round" id="prevBtn" aria-label="earlier bird"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg></button>
+      <div class="who-text">
+        <div class="bird-name" id="birdName"></div>
+        <div class="sci" id="birdSci"></div>
+      </div>
+      <button class="round" id="nextBtn" aria-label="later bird"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>
+    </div>
+
+    <div class="listen" id="listen"></div>
+
+    <div class="chips" id="chips"></div>
+
+    <div class="fact">
+      <span class="fact-label"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 2.5h7.5L13 5v8.5H3z M10.5 2.5V5H13 M5.5 8h5 M5.5 10.8h3.5"/></svg>FIELD NOTE <span id="factNum"></span></span>
+      <p id="factText"></p>
+      <p class="credit" id="credit"></p>
+    </div>
+
+    <div class="timer" id="timer" role="timer" aria-live="off">
+      <svg class="ring" viewBox="0 0 48 48" aria-hidden="true">
+        <circle class="track-c" cx="24" cy="24" r="19" fill="none" stroke-width="5"/>
+        <circle class="fill-c" id="ringFill" cx="24" cy="24" r="19" fill="none" stroke-width="5" stroke-linecap="round" transform="rotate(-90 24 24)" stroke-dasharray="119.4" stroke-dashoffset="119.4"/>
+        <circle class="dot" cx="24" cy="24" r="2.6"/>
+        <path id="ringHand" d="M24 24 L24 12" stroke="var(--ink)" stroke-width="2.4" stroke-linecap="round"/>
+      </svg>
+      <div class="timer-text">
+        <span class="timer-label" id="timerLabel">next bird lands in</span>
+        <span class="count" id="count">--</span>
+      </div>
+    </div>
+
+    <button class="pill more" id="moreBtn" aria-haspopup="dialog">view the bird log</button>
+  </section>
+
+  <footer class="foot">
+    <p class="note" id="note"></p>
+  </footer>
+  <p id="live" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);margin:0"></p>
+</main>
+
+<div class="sheet-wrap" id="logSheet" hidden>
+  <div class="backdrop" data-close></div>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="logTitle">
+    <div class="grab"></div>
+    <div class="sheet-head"><h2 id="logTitle">bird log<span class="sheet-sub">last 7 days</span></h2><button class="round" data-close aria-label="close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="life" id="life"></div>
+    <div class="log" id="logList"></div>
+    <p class="sheet-note">tap a bird to look back at it</p>
+  </div>
+</div>
+
+<div class="sheet-wrap" id="howSheet" hidden>
+  <div class="backdrop" data-close></div>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="howTitle">
+    <div class="grab"></div>
+    <div class="sheet-head"><h2 id="howTitle">how birdcrab works</h2><button class="round" data-close aria-label="close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="how" id="howBody"></div>
+  </div>
+</div>
+
+<div class="sheet-wrap" id="installSheet" hidden>
+  <div class="backdrop" data-close></div>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="installTitle">
+    <div class="grab"></div>
+    <div class="sheet-head"><h2 id="installTitle">put birdcrab on your phone</h2><button class="round" data-close aria-label="close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="install-app"><div class="icon" id="installIcon"></div><div><b>birdcrab</b><small>opens full screen from your home screen, like an app</small></div></div>
+    <ol class="steps" id="installSteps"></ol>
+    <p class="sheet-note" id="installNote" hidden></p>
+  </div>
+</div>
+<script>
+(() => {
+  "use strict";
+  const $ = (s) => document.querySelector(s);
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+  const framed = (() => { try { return window.top !== window.self; } catch (e) { return true; } })();
+
+  /* ---------- storage (per-viewer convenience only: unit and which half-days you caught) ---------- */
+  const store = {
+    get() { try { return JSON.parse(localStorage.getItem("birdcrab-v1") || "{}"); } catch (e) { return {}; } },
+    set(v) { try { localStorage.setItem("birdcrab-v1", JSON.stringify(v)); } catch (e) {} }
+  };
+  const saved = store.get();
+
+  /* ---------- the birds, in the order they land ----------
+     n name, sci scientific name, a archetype, p perch, cm length (ht: standing height), w where it lives,
+     c colors (b back, u belly, h head, n neck, w wing, t tail, k beak, kt beak tip, kl lower beak, e iris, l legs, c crest),
+     m markings, x build overrides, gl glow, f two field notes (one per trip around the list) */
+  const BIRDS = [
+    { n: "american robin", sci: "Turdus migratorius", a: "song", cm: 25, w: "across north america", gl: "#e2804f",
+      c: { b: "#6a625a", h: "#3a3532", u: "#d9733f", k: "#e9b94a", l: "#8a7a6a" }, m: { ring: "#efe6d6" },
+      f: ["robins hunt worms mostly by sight. that head tilt is them lining up one eye with the ground.",
+          "it's a thrush, not a true robin. colonists named it after europe's robin for the same red-orange breast."] },
+    { n: "great blue heron", sci: "Ardea herodias", a: "wader", cm: 117, w: "north & central america", gl: "#5b8fd6",
+      c: { b: "#6f7f90", u: "#8f9aa6", h: "#efe9e1", n: "#a8b0b8", c: "#2b2522", k: "#e9b94a", l: "#7a6a5a" }, m: { brow: "#2b2522" }, x: { crest: "quills", cs: .8 },
+      f: ["it stands about 4 feet tall but weighs only 5 or 6 pounds, partly thanks to hollow bones.",
+          "it hunts day and night. extra rod cells in its eyes help it see in the dark."] },
+    { n: "ruby-throated hummingbird", sci: "Archilochus colubris", a: "hummer", cm: 9, w: "eastern north america, winters in central america", gl: "#6fb25d", s: 1.5,
+      c: { b: "#4f8a54", u: "#e8e4dc", k: "#2b2522" }, m: { throat: "#d8352a" },
+      f: ["its wings beat about 50 times a second, which is where the hum comes from.",
+          "many fly nonstop across the gulf of mexico each spring and fall, a trip of about 500 miles."] },
+    { n: "snowy owl", sci: "Bubo scandiacus", a: "owl", p: "snow", cm: 60, w: "arctic tundra", gl: "#9cc4ff",
+      c: { b: "#f4f1ea", u: "#f4f1ea", h: "#f4f1ea", f: "#ffffff", e: "#f3c95c", l: "#f4f1ea", k: "#3b3330" }, m: { spots: "#3b3330" }, x: { by: -40 },
+      f: ["unlike most owls, snowy owls hunt by day. in the arctic summer the sun barely sets.",
+          "one snowy owl can eat more than 1,600 lemmings in a year."] },
+    { n: "mallard", sci: "Anas platyrhynchos", a: "duck", cm: 58, w: "the northern hemisphere, and city ponds everywhere", gl: "#3fa58a",
+      c: { b: "#8f8a80", u: "#c8c2b6", h: "#2f6b4f", n: "#2f6b4f", w: "#6f6a62", t: "#3b3330", k: "#e9c46a" }, m: { collar: "#f6f1e8", chest: "#7a4a36", patch: "#3d5fa8" },
+      f: ["only the female makes the loud classic quack. males give a quieter, raspy call.",
+          "nearly every breed of farm duck descends from the mallard. the muscovy is the exception."] },
+    { n: "scarlet macaw", sci: "Ara macao", a: "parrot", cm: 84, w: "central & south american rainforests", gl: "#ef5b3a",
+      c: { b: "#d8352a", u: "#d8352a", h: "#d8352a", w: "#3d6db5", t: "#d8352a", k: "#efe6d6", kl: "#2b2522", l: "#5a5f68" }, m: { patch: "#f3c95c", bare: "#f6f1e8" }, x: { tl: 58 },
+      f: ["flocks gather at riverbank clay licks, most likely for salt their rainforest diet lacks.",
+          "pairs usually stay together for life and often fly so close their wings nearly touch."] },
+    { n: "peregrine falcon", sci: "Falco peregrinus", a: "raptor", p: "rock", cm: 41, w: "every continent but antarctica", gl: "#8fb3d9",
+      c: { b: "#5d6a78", u: "#efe6d6", h: "#2f3540", w: "#4f5b68", k: "#5a5f68", cere: "#f3c95c", l: "#f3c95c" }, m: { bars: "#5d6a78", throat: "#efe6d6", cheek: "#efe6d6", ring: "#f3c95c" },
+      f: ["in a hunting dive it can top 200 mph, which makes it the fastest animal on earth.",
+          "peregrines nest on skyscrapers and bridges in many big cities and hunt the pigeons there."] },
+    { n: "atlantic puffin", sci: "Fratercula arctica", a: "shore", p: "rock", cm: 30, w: "north atlantic coasts", gl: "#e2804f",
+      c: { b: "#2b2b2e", u: "#f6f1e8", h: "#e8e4dc", k: "#e2804f", l: "#e2804f" }, m: { cap: "#2b2b2e", nape: "#2b2b2e" }, x: { tilt: 40, bw: 22, bh: 15, by: -30, hx: -10, hy: -52, hr: 13, beak: "puffin", bl: 14, tail: "stub", tl: 10 },
+      f: ["a puffin can carry a dozen or more small fish crosswise in its bill, pinned by spines on its tongue.",
+          "the bright orange bill plates fall off after the breeding season and grow back the next spring."] },
+    { n: "northern cardinal", sci: "Cardinalis cardinalis", a: "song", cm: 22, w: "eastern & southern us and mexico", gl: "#ef5b3a",
+      c: { b: "#c8372d", w: "#a62a24", t: "#a62a24", c: "#c8372d", k: "#e2804f", l: "#8a6a5a" }, m: { face: "#2b2522" }, x: { crest: "point", beak: "cone", bl: 10 },
+      f: ["female cardinals sing too, often from the nest, possibly to tell the male when to bring food.",
+          "cardinals sometimes fight their own reflection in windows, guarding their turf from a rival who isn't there."] },
+    { n: "american flamingo", sci: "Phoenicopterus ruber", a: "wader", cm: 127, w: "the caribbean, yucatán & galápagos", gl: "#ef5b3a",
+      c: { b: "#f08a7a", u: "#f4a090", h: "#f08a7a", n: "#f08a7a", w: "#e66a5a", k: "#f6e6dc", kt: "#2b2522", l: "#e66a5a" }, m: { wingtip: "#2b2522" }, x: { beak: "bent", bl: 21, bh2: 4.6, neck: [16, -142], hx: -16, hy: -134 },
+      f: ["flamingos are pink because of pigments in the algae and tiny shrimp they eat.",
+          "they feed with their heads upside down, straining food through comb-like edges on the bill."] },
+    { n: "greater roadrunner", sci: "Geococcyx californianus", a: "runner", cm: 56, w: "deserts of the southwest us & mexico", gl: "#d4a24a",
+      c: { b: "#7a6a5a", u: "#e8dcc6", h: "#7a6a5a", c: "#4f3a2d", w: "#6a5a4a", t: "#5a4a3a", k: "#3b3330", l: "#6a7a8a" }, m: { speckle: "#efe6d6", spots: "#4f3a2d", earpatch: "#5b8fd6" },
+      f: ["roadrunners can sprint around 20 mph, and they'd rather run than fly.",
+          "they're quick enough to catch and eat rattlesnakes."] },
+    { n: "emperor penguin", sci: "Aptenodytes forsteri", a: "penguin", cm: 115, ht: true, w: "antarctica", gl: "#9cc4ff",
+      c: { b: "#2b2b2e", u: "#f6f1e8", h: "#232326", k: "#2b2522", kt: "#e2804f", l: "#3b3330" }, m: { earpatch: "#f3b54a", chest: "#f6d78a" },
+      f: ["dads keep the egg balanced on their feet through the antarctic winter, eating nothing for about two months.",
+          "emperor penguins can dive deeper than 1,600 feet in search of fish and squid."] },
+    { n: "blue jay", sci: "Cyanocitta cristata", a: "song", cm: 28, w: "eastern & central north america", gl: "#5b8fd6",
+      c: { b: "#4f7fc0", h: "#4f7fc0", u: "#e8e4dc", w: "#3d6db5", t: "#3d6db5", c: "#4f7fc0", k: "#2b2522", l: "#3b3330" }, m: { throat: "#efe9e1", wingbars: "#efe9e1", mask: "#2b2522" }, x: { crest: "point", bl: 13, beak: "cone", tl: 28 },
+      f: ["blue jays aren't really blue. the color is light bouncing off feather structure, so a crushed feather looks brown.",
+          "they can imitate the scream of a red-shouldered hawk, maybe to warn other jays or scare off rivals."] },
+    { n: "common kingfisher", sci: "Alcedo atthis", a: "kingf", cm: 16, w: "europe, asia & north africa", gl: "#4fa3bf", s: .9,
+      c: { b: "#2fa0c8", w: "#2b7fa8", h: "#2b7fa8", u: "#e8803a", t: "#2b7fa8", k: "#2b2522", l: "#e0402e" }, m: { cheek: "#e8803a", throat: "#f6f1e8" }, x: { crest: null },
+      f: ["its bill inspired the nose of japan's 500 series bullet train, which stopped the loud boom it made leaving tunnels.",
+          "it dives for fish, whacks them on a branch, then swallows them headfirst."] },
+    { n: "barn owl", sci: "Tyto alba", a: "owl", cm: 36, w: "every continent but antarctica", gl: "#e9b94a",
+      c: { b: "#d4a55f", u: "#f4ede0", h: "#d4a55f", f: "#f6f1e8", k: "#c8b8a8" }, m: { spots: "#8a6a4a" }, x: { heart: true },
+      f: ["barn owls can catch mice in total darkness by sound alone.",
+          "one ear opening sits higher than the other, which helps them pinpoint sounds above and below."] },
+    { n: "wood duck", sci: "Aix sponsa", a: "duck", cm: 49, w: "wooded swamps of north america", gl: "#3fa58a",
+      c: { b: "#5a4636", h: "#2f5f4f", n: "#2f5f4f", c: "#2f5f4f", w: "#3d3a4a", t: "#2b2522", k: "#d24b3a", kt: "#2b2522", e: "#d24b3a" }, m: { throat: "#f6f1e8", chest: "#7a3a32", flank: "#c8a87a", stripe2: "#f6f1e8" }, x: { crest: "shaggy", cs: .9, beak: "dagger", bl: 12 },
+      f: ["the day after hatching, ducklings leap from their tree-hole nest, sometimes 50 feet up, and bounce away unhurt.",
+          "wood ducks have sharp claws for gripping bark and perching on branches, which most ducks can't do."] },
+    { n: "toco toucan", sci: "Ramphastos toco", a: "parrot", cm: 60, w: "south america", gl: "#e2804f",
+      c: { b: "#2b2b2e", u: "#2b2b2e", h: "#2b2b2e", t: "#2b2b2e", k: "#f08a3a", kt: "#2b2522", l: "#5b8fd6" }, m: { throat: "#f6f1e8", ring: "#5b8fd6" }, x: { beak: "big", bl: 38, tl: 30, hr: 14 },
+      f: ["that huge bill is light, built like a honeycomb inside, and it helps the toucan shed heat.",
+          "toucans sleep with their bill laid along their back and their tail folded up over it."] },
+    { n: "bald eagle", sci: "Haliaeetus leucocephalus", a: "raptor", p: "rock", cm: 86, w: "north america, near water", gl: "#d4b13f", s: 1.2,
+      c: { b: "#4a3628", u: "#4a3628", h: "#f6f1e8", t: "#f6f1e8", w: "#3d2c20", k: "#f3c95c", cere: "#f3c95c", e: "#f3c95c", l: "#f3c95c" }, m: {},
+      f: ["bald eagles build the biggest nests of any north american bird. one in florida was 9.5 feet wide and 20 feet deep.",
+          "'bald' comes from an old english word for white, not from being featherless."] },
+    { n: "north island brown kiwi", sci: "Apteryx mantelli", a: "kiwi", cm: 45, w: "new zealand", gl: "#6f9a57",
+      c: { b: "#8a6a4a", u: "#7a5a40", h: "#8a6a4a", k: "#e8d8b8", l: "#c8b8a8" }, m: { speckle: "#6a5040" }, x: { wings: "none" },
+      f: ["a kiwi's nostrils sit at the tip of its long bill, so it can sniff out worms underground.",
+          "a kiwi egg can weigh about a fifth of the mother's body weight."] },
+    { n: "black-capped chickadee", sci: "Poecile atricapillus", a: "song", cm: 13, w: "northern us & canada", gl: "#9cc4ff", s: .85,
+      c: { b: "#8f8f88", h: "#efe9e1", u: "#e8dcc6", w: "#6f6f6a", t: "#6f6f6a", k: "#2b2522", l: "#5a5f68" }, m: { cap: "#2b2522", throat: "#2b2522", flank: "#d8b88f", wingbars: "#d8d4cc" }, x: { bl: 7 },
+      f: ["the more 'dee' notes in its chick-a-dee call, the more dangerous the predator it's warning about.",
+          "chickadees hide thousands of seeds each fall and remember where they put them."] },
+    { n: "secretary bird", sci: "Sagittarius serpentarius", a: "wader", p: "sand", cm: 125, ht: true, w: "african grasslands", gl: "#d4b13f",
+      c: { b: "#c8c4bc", u: "#d8d4cc", h: "#d8d4cc", n: "#d8d4cc", c: "#2b2522", w: "#b8b4ac", t: "#2b2522", k: "#5a5f68", cere: "#9aa6b0", l: "#e8c8a8" }, m: { bare: "#e2804f", wingtip: "#2b2522" },
+      x: { beak: "hook", bl: 12, hr: 11, hx: -20, hy: -128, crest: "quills", tail: "long", tl: 40, ta: 50, neck: [-6, -108], nw: 9 },
+      f: ["it kills snakes by stomping on them, with a kick that lands in about 15 milliseconds.",
+          "it's a bird of prey that hunts on foot, striding through tall grass on long legs."] },
+    { n: "european starling", sci: "Sturnus vulgaris", a: "song", cm: 21, w: "europe & asia, now worldwide", gl: "#7a6fc9",
+      c: { b: "#38423f", h: "#38423f", w: "#323b3a", t: "#323b3a", k: "#e9c46a", l: "#c88a8a" }, m: { speckle: "#efe6d6" }, x: { tail: "stub", tl: 14, beak: "dagger", bl: 13 },
+      f: ["in a murmuration, each starling tracks about seven of its nearest neighbors, and the whole flock turns as one.",
+          "all of north america's starlings descend from about 100 birds released in new york's central park in 1890 and 1891."] },
+    { n: "mute swan", sci: "Cygnus olor", a: "duck", cm: 150, w: "europe & asia, now north america too", gl: "#9cc4ff", s: 1.05,
+      c: { b: "#f6f1e8", h: "#f6f1e8", n: "#f6f1e8", w: "#e8e2d8", t: "#e8e2d8", k: "#e2804f" }, m: { face: "#2b2522" }, x: { bw: 40, bh: 17, neck: [-46, -26], nw: 11, hx: -30, hy: -68, hr: 11, bl: 17 },
+      f: ["despite the name, mute swans hiss, grunt and snort, especially near their nest.",
+          "their wings make a loud throbbing sound in flight that you can hear from far away."] },
+    { n: "pileated woodpecker", sci: "Dryocopus pileatus", a: "wood", cm: 43, w: "forests of north america", gl: "#ef5b3a", s: 1.15,
+      c: { b: "#2b2522", h: "#2b2522", u: "#2b2522", c: "#d8352a", k: "#5a5f68", l: "#5a5f68" }, m: { cap: "#d8352a", stripe2: "#f6f1e8" }, x: { crest: "point", cs: 1.1 },
+      f: ["its rectangular holes can be so deep that small trees snap in half.",
+          "like other woodpeckers, its tongue wraps around the back of its skull when it isn't using it."] },
+    { n: "common ostrich", sci: "Struthio camelus", a: "ratite", cm: 250, ht: true, w: "african savanna", gl: "#d4a24a",
+      c: { b: "#2b2b2e", w: "#2b2b2e", t: "#f6f1e8", h: "#c8b8a8", n: "#e8b0a0", k: "#e8c0a8", l: "#e8b0a0" }, m: { wingtip: "#f6f1e8" },
+      f: ["ostriches lay the biggest eggs of any living bird, about 3 pounds each.",
+          "they can sprint at around 43 mph, faster than any other bird on land."] },
+    { n: "painted bunting", sci: "Passerina ciris", a: "song", cm: 13, w: "southern us & mexico", gl: "#ef5b3a", s: .85,
+      c: { b: "#5aa04a", h: "#3d6db5", u: "#d8352a", w: "#4a8a3d", t: "#8a4a3a", k: "#5a5f68", l: "#8a7a6a" }, m: { ring: "#d8352a" }, x: { beak: "cone", bl: 9 },
+      f: ["its old french name, nonpareil, means 'without equal'.",
+          "young males stay green like females until their second fall, when the full rainbow comes in."] },
+    { n: "brown pelican", sci: "Pelecanus occidentalis", a: "shore", p: "rock", cm: 125, w: "american coasts", gl: "#d4a24a",
+      c: { b: "#7a6a5a", u: "#8a7a6a", h: "#f0e2b0", n: "#5a3a2a", w: "#6a5a4a", t: "#5a4a3a", k: "#c8b08a", kl: "#5a5f68", l: "#3b3330" },
+      x: { bw: 34, bh: 17, by: -40, neck: [-14, -54], nw: 11, hx: -24, hy: -78, hr: 11, beak: "pouch", bl: 40, legs: "thick" },
+      f: ["it dives headfirst from as high as 60 feet, and air sacs under its skin cushion the hit.",
+          "after a catch, it drains the water out of its pouch before swallowing the fish."] },
+    { n: "great horned owl", sci: "Bubo virginianus", a: "owl", cm: 55, w: "the americas", gl: "#d4a24a",
+      c: { b: "#8a6a4a", u: "#c8a87a", h: "#8a6a4a", f: "#c88a4a", e: "#f3c95c", k: "#3b3330" }, m: { bars: "#4f3a2d", throat: "#efe9e1" }, x: { ears: true },
+      f: ["those 'horns' are tufts of feathers. its real ears are hidden on the sides of its head.",
+          "great horned owls are one of the few animals that regularly hunt skunks."] },
+    { n: "budgerigar", sci: "Melopsittacus undulatus", a: "parrot", cm: 18, w: "the australian outback", gl: "#6fb25d", s: .85,
+      c: { b: "#7fbf4a", u: "#7fbf4a", h: "#f3dd5c", w: "#6a8a3a", t: "#2f6fb5", k: "#e8c0a0", cere: "#5b8fd6", l: "#8a9098" }, m: { wingbars: "#2b2522", throat: "#f3dd5c" }, x: { tl: 32, hr: 13, bw: 19, bh: 12 },
+      f: ["wild budgies are green and yellow. the blue and white ones come from breeding.",
+          "a budgie named puck holds the record for the biggest bird vocabulary: over 1,700 words."] },
+    { n: "arctic tern", sci: "Sterna paradisaea", a: "shore", p: "rock", cm: 33, w: "the arctic to the antarctic", gl: "#9cc4ff",
+      c: { b: "#d8dee2", u: "#e8ecee", h: "#f6f1e8", w: "#c8d0d6", t: "#efe9e1", k: "#d24b3a", l: "#d24b3a" }, m: { cap: "#2b2522", wingtip: "#8f9aa6" }, x: { tail: "fork", tl: 26, ta: 6, by: -26, hy: -42, hx: -20, bl: 15 },
+      f: ["it makes the longest migration of any animal, about 44,000 miles a year, pole to pole and back.",
+          "by chasing summer at both ends of the earth, it sees more daylight than any other animal."] },
+    { n: "american goldfinch", sci: "Spinus tristis", a: "song", cm: 12, w: "north america", gl: "#e9c46a", s: .85,
+      c: { b: "#f3c95c", w: "#2b2522", t: "#2b2522", k: "#e8a87c", l: "#c8a08a" }, m: { cap: "#2b2522", wingbars: "#efe9e1" }, x: { beak: "cone", bl: 9 },
+      f: ["goldfinches are strict vegetarians. even their chicks are raised on seeds.",
+          "they molt twice a year, trading bright yellow summer feathers for drab olive in winter."] },
+    { n: "wild turkey", sci: "Meleagris gallopavo", a: "ground", cm: 110, w: "north american woods", gl: "#d4a24a",
+      c: { b: "#4a3a30", h: "#9cc4e8", n: "#c8372d", w: "#5a4636", t: "#5a4636", k: "#c8b08a", l: "#c8a8a0" }, m: { wattle: "#c8372d", snood: "#c8372d", wingbars: "#efe6d6", speckle: "#8a6a4a", fanband: "#c8a87a" }, x: { tail: "fan", tl: 52 },
+      f: ["despite their size, wild turkeys fly well and roost up in trees at night.",
+          "the bare skin on a male's head can shift between red, white and blue with his mood."] },
+    { n: "osprey", sci: "Pandion haliaetus", a: "raptor", cm: 57, w: "every continent but antarctica", gl: "#8fb3d9",
+      c: { b: "#4a3a30", u: "#f6f1e8", h: "#f6f1e8", w: "#3d3028", t: "#5a4a3a", k: "#2b2522", cere: "#5a6670", e: "#f3c95c", l: "#c8c4bc" }, m: { stripe2: "#4a3a30" },
+      f: ["an osprey can swing one front toe backward, so it holds a fish with two toes on each side.",
+          "it's one of the most widespread birds of prey, found on every continent except antarctica."] },
+    { n: "common loon", sci: "Gavia immer", a: "duck", cm: 81, w: "northern lakes of north america", gl: "#5b8fd6",
+      c: { b: "#2f3030", h: "#24302c", n: "#24302c", u: "#f6f1e8", w: "#2a2b2b", t: "#2a2b2b", k: "#2b2522", e: "#c8372d" }, m: { speckle: "#f6f1e8", collar: "#f6f1e8" }, x: { neck: [-26, -18], hy: -34, beak: "dagger", bl: 18 },
+      f: ["unlike most birds, loons have solid bones, which makes them heavy and helps them dive.",
+          "loons can dive as deep as 200 feet chasing fish."] },
+    { n: "laughing kookaburra", sci: "Dacelo novaeguineae", a: "kingf", cm: 43, w: "eastern australia", gl: "#d4a24a", s: 1.1,
+      c: { b: "#7a6050", u: "#efe6d6", h: "#efe6d6", c: "#8a7060", w: "#6a5040", t: "#c8603a", k: "#2b2522", l: "#8a7a6a" }, m: { stripe2: "#5a4030", patch: "#6f9ab5" }, x: { cs: .6 },
+      f: ["it's a giant kingfisher that rarely eats fish. snakes, lizards and insects suit it better.",
+          "family groups 'laugh' together at dawn and dusk to tell neighbors whose territory it is."] }
+  ];
+  BIRDS.push(
+    { n: "scarlet ibis", sci: "Eudocimus ruber", a: "wader", cm: 60, w: "northern south america", gl: "#ef5b3a",
+      c: { b: "#e0402e", u: "#e85a40", h: "#e0402e", n: "#e0402e", w: "#d0382a", k: "#9a3a32", l: "#e0402e" }, m: { wingtip: "#2b2522" }, x: { beak: "curved", bl: 26, by: -66, neck: [-6, -84], hy: -96, hx: -22 },
+      f: ["chicks hatch gray-brown and turn scarlet from the pigments in the crabs and shrimp they eat.",
+          "it's the national bird of trinidad and tobago."] },
+    { n: "cedar waxwing", sci: "Bombycilla cedrorum", a: "song", cm: 17, w: "north america", gl: "#e9c46a",
+      c: { b: "#b8956a", h: "#b8956a", u: "#e8dc9a", c: "#b8956a", w: "#8a8a80", t: "#7a7a72", k: "#2b2522", l: "#3b3330" }, m: { mask: "#2b2522", patch: "#d8352a", tailtip: "#f3c95c" }, x: { crest: "point", cs: .9 },
+      f: ["a row of waxwings will sometimes pass a berry beak to beak down the branch.",
+          "waxwings with orange tail tips instead of yellow ate the berries of a non-native honeysuckle while growing."] },
+    { n: "sulphur-crested cockatoo", sci: "Cacatua galerita", a: "parrot", cm: 48, w: "australia & new guinea", gl: "#e9c46a",
+      c: { b: "#f6f1e8", u: "#f6f1e8", h: "#f6f1e8", w: "#ece6da", t: "#ece6da", c: "#f3dd5c", k: "#2b2522", l: "#5a5f68" }, m: {}, x: { crest: "fan", cs: 1.1, tl: 34 },
+      f: ["cockatoos in sydney learned to flip open wheelie bins, and the trick spread from suburb to suburb.",
+          "the yellow crest flips up when it's excited or alarmed."] },
+    { n: "burrowing owl", sci: "Athene cunicularia", a: "owl", p: "sand", cm: 24, w: "open plains of the americas", gl: "#c8a87a", s: .9,
+      c: { b: "#8a6a4a", u: "#e8dcc6", h: "#8a6a4a", f: "#a88a6a", e: "#f3c95c", l: "#c8b8a8", k: "#c8b8a8" }, m: { bars: "#8a6a4a", brow: "#efe9e1" }, x: { by: -46, bw: 21, bh: 24, hr: 19 },
+      f: ["it nests underground, often in an old prairie dog or ground squirrel burrow.",
+          "it scatters dung around its burrow, which draws dung beetles for it to eat."] },
+    { n: "mandarin duck", sci: "Aix galericulata", a: "duck", cm: 45, w: "east asia", gl: "#e2804f",
+      c: { b: "#7a4a36", h: "#c87a3a", n: "#c87a3a", c: "#3d5f8f", w: "#c8603a", t: "#3b3330", k: "#d24b3a" }, m: { cap: "#3d5f8f", brow: "#f6f1e8", chest: "#5a3a6a", flank: "#c8a06a" }, x: { crest: "shaggy", cs: .8, beak: "dagger", bl: 11 },
+      f: ["in china, a pair of mandarin ducks is a traditional symbol of a happy marriage.",
+          "a wild population has lived in britain for over a century, descended from escaped birds."] },
+    { n: "red-tailed hawk", sci: "Buteo jamaicensis", a: "raptor", cm: 52, w: "north & central america", gl: "#e2804f", s: 1.05,
+      c: { b: "#7a5236", u: "#efe6d6", h: "#7a5236", w: "#6a4630", t: "#c8603a", k: "#3b3330", cere: "#e9c46a", l: "#f3c95c" }, m: { spots: "#7a5236", throat: "#efe6d6" },
+      f: ["the fierce scream movies give to eagles is usually a red-tailed hawk's.",
+          "young red-tails don't have red tails. the rusty color shows up in their second year."] },
+    { n: "eastern bluebird", sci: "Sialia sialis", a: "song", cm: 18, w: "eastern north america", gl: "#5b8fd6", s: .9,
+      c: { b: "#4f86c6", h: "#4f86c6", u: "#d9733f", w: "#3f72b0", t: "#3f72b0", k: "#2b2522", l: "#3b3330" }, m: {},
+      f: ["bluebirds can spot an insect in the grass from 60 feet away.",
+          "after big declines in the 1900s, nest boxes put up by volunteers helped them bounce back."] },
+    { n: "shoebill", sci: "Balaeniceps rex", a: "wader", cm: 120, ht: true, w: "swamps of east africa", gl: "#8fb3d9",
+      c: { b: "#7a8690", u: "#8a96a0", h: "#8a96a0", n: "#8a96a0", c: "#8a96a0", w: "#6a7680", k: "#c8b8a0", e: "#e8e4c8", l: "#3b3330" },
+      x: { hr: 15, hx: -18, hy: -118, beak: "shoe", bl: 26, nw: 13, neck: [-6, -102], crest: "shaggy", cs: .45, by: -78 },
+      f: ["a shoebill can stand still for hours, waiting for a lungfish to come up for air.",
+          "shoebills greet each other by clattering their huge bills."] },
+    { n: "indian peafowl", sci: "Pavo cristatus", a: "ground", cm: 210, w: "india & sri lanka", gl: "#3fa58a", note: "with its train",
+      c: { b: "#2f6fb5", h: "#2f6fb5", n: "#2f6fb5", c: "#2f6fb5", w: "#c8b08a", t: "#4f8a4a", k: "#c8b08a", l: "#9a9890" }, m: { brow: "#f6f1e8" }, x: { tail: "train", tl: 74, crest: "topknot", move: "sway" },
+      f: ["the peacock's 'tail' is really a train of about 200 long feathers growing from its back.",
+          "those shimmering colors come from tiny structures in the feathers that bend light, not from pigment."] },
+    { n: "common raven", sci: "Corvus corax", a: "song", p: "rock", cm: 61, w: "the northern hemisphere", gl: "#7a6fc9", s: 1.3,
+      c: { b: "#313139", h: "#313139", w: "#2b2b32", t: "#2b2b32", k: "#313139", l: "#313139" }, m: {}, x: { beak: "dagger", bl: 15, bh2: 5, tilt: 18 },
+      f: ["in lab tests, ravens saved a tool for later, a sign they can plan ahead.",
+          "it's the world's biggest songbird, a cousin of crows and jays."] },
+    { n: "bee hummingbird", sci: "Mellisuga helenae", a: "hummer", cm: 5.5, w: "cuba", gl: "#d8457a", s: 1.1,
+      c: { b: "#4f7fc0", h: "#d8457a", u: "#e8e4dc", k: "#2b2522" }, m: { throat: "#d8457a" },
+      f: ["it's the smallest bird in the world and weighs less than a dime.",
+          "its nest is about an inch across and its eggs are the size of peas."] },
+    { n: "herring gull", sci: "Larus argentatus", a: "shore", cm: 60, w: "northern coasts", gl: "#8fb3d9",
+      c: { b: "#9aa6b0", u: "#f6f1e8", h: "#f6f1e8", w: "#9aa6b0", t: "#f6f1e8", k: "#f3c95c", e: "#f3c95c", l: "#e8a8a0" }, m: { wingtip: "#2b2522" }, x: { beak: "gull", bl: 16 },
+      f: ["chicks peck the red spot on a parent's bill to ask for food.",
+          "gulls can drink salt water. glands above their eyes get rid of the extra salt."] },
+    { n: "baltimore oriole", sci: "Icterus galbula", a: "song", cm: 20, w: "eastern north america", gl: "#e2804f",
+      c: { b: "#2b2522", h: "#2b2522", u: "#f08a2a", w: "#2b2522", t: "#f08a2a", k: "#5a5f68", l: "#5a5f68" }, m: { wingbars: "#f6f1e8" }, x: { bl: 13 },
+      f: ["orioles weave hanging, sock-like nests out of plant fibers, hair and sometimes string.",
+          "it's named for lord baltimore, whose coat of arms had the same orange and black."] },
+    { n: "emu", sci: "Dromaius novaehollandiae", a: "ratite", cm: 175, ht: true, w: "australia", gl: "#d4b13f",
+      c: { b: "#6a5a4a", w: "#5a4a3a", t: "#6a5a4a", h: "#4a5a6a", n: "#5a6a7a", k: "#3b3330", l: "#5a5f68" }, m: { speckle: "#8a7a6a" }, x: { by: -84, hy: -146, neck: [-28, -104] },
+      f: ["dad does all the incubating, barely eating or drinking for about eight weeks.",
+          "emu feathers are double: two plumes grow from each quill."] },
+    { n: "kea", sci: "Nestor notabilis", a: "parrot", p: "snow", cm: 48, w: "new zealand's southern alps", gl: "#e2804f",
+      c: { b: "#6f8a4a", u: "#6f8a4a", h: "#7a8a4a", w: "#5f7a3d", t: "#5f7a3d", k: "#3b3330", l: "#5a5f68" }, m: { wingtip: "#e2804f" }, x: { bl: 16, tl: 30 },
+      f: ["it's the world's only alpine parrot, living in new zealand's snowy mountains.",
+          "keas are famous for pulling the rubber off car windshield wipers."] },
+    { n: "sandhill crane", sci: "Antigone canadensis", a: "wader", cm: 110, w: "north america", gl: "#d4a24a",
+      c: { b: "#9a9890", u: "#a8a69e", h: "#a8a69e", n: "#a8a69e", w: "#8a8880", t: "#8a8880", k: "#3b3330", e: "#e2804f", l: "#3b3330" }, m: { cap: "#c8372d", cheek: "#efe9e1" }, x: { tail: "round", tl: 22, ta: 30, bl: 22 },
+      f: ["cranes dance: they bow, leap and toss sticks into the air.",
+          "they paint their gray feathers rusty brown by preening with iron-rich mud."] },
+    { n: "northern mockingbird", sci: "Mimus polyglottos", a: "song", cm: 25, w: "us & mexico", gl: "#8fb3d9",
+      c: { b: "#8a8a84", u: "#e8e4dc", h: "#8a8a84", w: "#5a5a56", t: "#4a4a46", k: "#2b2522", e: "#e9c46a", l: "#3b3330" }, m: { wingbars: "#efe9e1", stripe2: "#5a5a56" }, x: { tail: "long", tl: 32, bl: 12 },
+      f: ["a male can learn around 200 songs in its life, many borrowed from other birds.",
+          "it's the state bird of five states: arkansas, florida, mississippi, tennessee and texas."] },
+    { n: "american kestrel", sci: "Falco sparverius", a: "raptor", cm: 25, w: "the americas", gl: "#e2804f", s: .85,
+      c: { b: "#c8603a", u: "#e8c9a0", h: "#efe6d6", w: "#6f8fb5", t: "#c8603a", k: "#5a5f68", cere: "#f3c95c", l: "#f3c95c" }, m: { cap: "#6f8fb5", spots: "#3b3330", tailtip: "#2b2522", stripe2: "#2b2522" },
+      f: ["it's the smallest falcon in north america, about the size of a mourning dove.",
+          "kestrels can hover in one spot, facing into the wind while they scan the ground for prey."] },
+    { n: "resplendent quetzal", sci: "Pharomachrus mocinno", a: "parrot", cm: 100, w: "central american cloud forests", gl: "#3fa58a", note: "with its streamers",
+      c: { b: "#2f8f5a", u: "#c8372d", h: "#2f8f5a", c: "#2f8f5a", w: "#2a7f50", t: "#3a9f68", k: "#e9c46a", l: "#5a5f68" }, m: {}, x: { beak: "cone", bl: 7, tail: "streamers", tl: 86, ta: 4, crest: "point", cs: .7 },
+      f: ["guatemala's money, the quetzal, is named after this bird.",
+          "a male's tail streamers can stretch about two feet past the rest of its body."] },
+    { n: "wandering albatross", sci: "Diomedea exulans", a: "duck", cm: 115, w: "the southern ocean", gl: "#9cc4ff",
+      c: { b: "#f6f1e8", h: "#f6f1e8", w: "#3b3330", t: "#3b3330", k: "#e8b0a0", cere: "#e8b0a0" }, m: {}, x: { neck: null, bw: 40, bh: 14, hx: -38, hy: -24, hr: 12, beak: "hook", bl: 17, tail: "stub" },
+      f: ["it has the largest wingspan of any living bird, up to about 11 feet.",
+          "albatrosses can glide for hours without flapping, riding the wind off the waves."] },
+    { n: "red-headed woodpecker", sci: "Melanerpes erythrocephalus", a: "wood", cm: 22, w: "eastern north america", gl: "#ef5b3a",
+      c: { b: "#2b2522", h: "#c8302a", u: "#f6f1e8", k: "#8a9098", l: "#5a5f68" }, m: { patch: "#f6f1e8" },
+      f: ["it hides insects in cracks in trees and sometimes covers them with bark.",
+          "it catches insects in midair, more like a flycatcher than a woodpecker."] },
+    { n: "barn swallow", sci: "Hirundo rustica", a: "song", cm: 17, w: "every continent but antarctica", gl: "#5b8fd6",
+      c: { b: "#2f4f8a", h: "#2f4f8a", u: "#e8c9a0", w: "#2a4478", t: "#2a4478", k: "#2b2522", l: "#3b3330" }, m: { throat: "#b8502a", face: "#b8502a" }, x: { tail: "fork", tl: 32, ta: 18, bw: 24, bh: 11, bl: 6 },
+      f: ["it's the most widespread swallow in the world.",
+          "barn swallows nest on buildings so often now that nests in caves are rare."] },
+    { n: "canada goose", sci: "Branta canadensis", a: "duck", cm: 90, w: "north america", gl: "#6fb25d",
+      c: { b: "#8a7a6a", u: "#e8e0d2", h: "#2b2522", n: "#2b2522", w: "#6a5a4a", t: "#2b2522", k: "#2b2522" }, m: { cheek: "#f6f1e8", chest: "#d8cfc2" }, x: { neck: [-36, -26], hy: -56 },
+      f: ["geese flying in a v save energy by riding the lift off the wingtip of the bird ahead.",
+          "pairs often stay together for life, and families migrate together."] },
+    { n: "hoopoe", sci: "Upupa epops", a: "song", p: "ground", cm: 28, w: "europe, asia & africa", gl: "#e2804f",
+      c: { b: "#d8a07a", h: "#d8a07a", u: "#e0b08a", c: "#d8a07a", w: "#2b2522", t: "#2b2522", k: "#3b3330", l: "#5a5f68" }, m: { cresttip: "#2b2522", wingbars: "#f6f1e8" },
+      x: { beak: "curved", bl: 22, bh2: 1.8, crest: "fan", cs: 1, tail: "stub", tl: 16, legs: "thin", by: -32, hy: -50, move: "peck" },
+      f: ["the hoopoe is israel's national bird.",
+          "nestlings defend themselves by spraying a foul-smelling liquid at intruders."] },
+    { n: "great egret", sci: "Ardea alba", a: "wader", cm: 97, w: "wetlands around the world", gl: "#9cc4ff",
+      c: { b: "#f6f1e8", u: "#f6f1e8", h: "#f6f1e8", n: "#f6f1e8", w: "#ece6da", t: "#ece6da", k: "#f3c95c", l: "#2b2522" }, m: {},
+      f: ["great egrets were hunted nearly to extinction for hat plumes, which led to some of the first bird protection laws.",
+          "it's the symbol of the national audubon society."] },
+    { n: "eurasian magpie", sci: "Pica pica", a: "song", cm: 46, w: "europe & asia", gl: "#5b8fd6", s: 1.1,
+      c: { b: "#313139", h: "#313139", u: "#f6f1e8", w: "#313139", t: "#2f4a8a", k: "#313139", l: "#313139" }, m: { patch: "#f6f1e8" }, x: { tail: "long", tl: 46, ta: 20, beak: "dagger", bl: 12 },
+      f: ["it's one of the few animals known to recognize itself in a mirror.",
+          "the idea that magpies steal shiny things is a myth. in one study they avoided shiny objects."] },
+    { n: "willow ptarmigan", sci: "Lagopus lagopus", a: "ground", p: "snow", cm: 38, w: "arctic & northern forests", gl: "#9cc4ff",
+      c: { b: "#f6f1e8", h: "#f6f1e8", w: "#ece6da", t: "#2b2522", k: "#2b2522", l: "#f6f1e8" }, m: { brow: "#d8352a" }, x: { by: -28, bw: 26, bh: 19, hy: -44, hx: -22, hr: 11, neck: null, tail: "stub", tl: 10, ta: 0 },
+      f: ["it turns white in winter and grows feathers on its feet that work like snowshoes.",
+          "it's the state bird of alaska."] },
+    { n: "belted kingfisher", sci: "Megaceryle alcyon", a: "kingf", cm: 33, w: "north america", gl: "#5b8fd6",
+      c: { b: "#5f7f9a", u: "#f6f1e8", h: "#5f7f9a", c: "#5f7f9a", w: "#4f6f8a", t: "#4f6f8a", k: "#2b2522", l: "#5a5f68" }, m: { throat: "#f6f1e8", band: "#c8603a" },
+      f: ["unusually for birds, the female is more colorful than the male, with an extra rusty band across her belly.",
+          "it digs its nest tunnel into a riverbank, sometimes several feet long."] },
+    { n: "red-winged blackbird", sci: "Agelaius phoeniceus", a: "song", cm: 22, w: "north america", gl: "#ef5b3a",
+      c: { b: "#313139", h: "#313139", w: "#313139", t: "#313139", k: "#313139", l: "#3b3330" }, m: { patch: "#d8352a" }, x: { beak: "dagger", bl: 12 },
+      f: ["males flash their red shoulder patches to defend territory, and can tuck them out of sight when they'd rather not.",
+          "it's one of the most abundant birds in north america."] },
+    { n: "andean condor", sci: "Vultur gryphus", a: "raptor", p: "rock", cm: 120, w: "the andes", gl: "#e2804f", s: 1.2,
+      c: { b: "#313139", u: "#313139", h: "#c88a7a", n: "#c88a7a", w: "#313139", t: "#313139", k: "#e8dcc6", cere: "#5a5f68", l: "#8a8a84" }, m: { collar: "#f6f1e8", patch: "#f6f1e8" }, x: { neck: [-8, -64], nw: 9, hr: 12, legs: "thick" },
+      f: ["one condor was tracked flying over 100 miles in five hours without flapping once.",
+          "it's one of the heaviest flying birds, at up to about 33 pounds."] },
+    { n: "house wren", sci: "Troglodytes aedon", a: "song", cm: 12, w: "the americas", gl: "#d4a24a", s: .8,
+      c: { b: "#8a6a4a", u: "#c8b08a", h: "#8a6a4a", w: "#7a5a3a", t: "#7a5a3a", k: "#5a4a3a", l: "#8a7a6a" }, m: { brow: "#c8b08a", wingbars: "#5a4030" }, x: { tail: "stub", ta: -55, tl: 16, bl: 10 },
+      f: ["males build several stick nests, and the female picks the one she likes.",
+          "house wrens tuck spider egg sacs into their nests. the baby spiders may eat the mites."] },
+    { n: "bar-tailed godwit", sci: "Limosa lapponica", a: "shore", p: "marsh", cm: 39, w: "arctic to australia & new zealand", gl: "#e2804f",
+      c: { b: "#a8805a", u: "#c8603a", h: "#c8603a", w: "#8a6a4a", t: "#8a6a4a", k: "#e8a090", kt: "#2b2522", l: "#3b3330" }, m: { speckle: "#5a4030" }, x: { beak: "upcurve", bl: 30, bh2: 2.2, legs: "long", by: -46, hy: -62, hx: -22 },
+      f: ["in 2022 a young godwit flew 8,425 miles nonstop from alaska to tasmania in 11 days.",
+          "before a long flight, godwits shrink their gut and other organs to make room for fuel."] },
+    { n: "tufted titmouse", sci: "Baeolophus bicolor", a: "song", cm: 15, w: "eastern us", gl: "#8fb3d9", s: .85,
+      c: { b: "#8f949a", h: "#8f949a", u: "#efe9e1", c: "#8f949a", w: "#7f848a", t: "#7f848a", k: "#2b2522", l: "#5a5f68" }, m: { flank: "#d8a07a", face: "#2b2522" }, x: { crest: "point", cs: .8, bl: 8 },
+      f: ["titmice pluck hair from live animals, sometimes even people, to line their nests.",
+          "they often join chickadees, their cousins, in mixed flocks in winter."] },
+    { n: "killdeer", sci: "Charadrius vociferus", a: "shore", p: "ground", cm: 25, w: "the americas", gl: "#d4a24a", s: .9,
+      c: { b: "#8a6a4a", u: "#f6f1e8", h: "#8a6a4a", w: "#7a5a3a", t: "#c8803a", k: "#2b2522", l: "#c8c0a0" }, m: { band: "#2b2522", brow: "#f6f1e8", throat: "#f6f1e8", ring: "#d8352a" }, x: { bl: 10 },
+      f: ["it fakes a broken wing to lure predators away from its nest.",
+          "its nest is just a scrape on bare ground, sometimes on a gravel rooftop or parking lot."] },
+    { n: "mourning dove", sci: "Zenaida macroura", a: "song", cm: 30, w: "north america", gl: "#d4a24a",
+      c: { b: "#b8a48a", h: "#c8b49a", u: "#d8c4aa", w: "#a8947a", t: "#a8947a", k: "#3b3330", l: "#d88a8a" }, m: { spots: "#3b3330", ring: "#9cc4e8" }, x: { tail: "long", tl: 34, ta: 22, bl: 8 },
+      f: ["doves can suck water up like a straw, so they don't have to tip their heads back to drink.",
+          "their wings make a sharp whistle when they take off."] }
+  );
+  /* ---------- sounds: one trimmed field recording per bird, published next to the page as sounds/<name>.mp4 ---------- */
+  const SOUNDS = {
+    "wood duck": {"len": 10.1, "kind": "", "by": "Jonathon Jongsma", "lic": "CC BY-SA 3.0", "page": "https://commons.wikimedia.org/wiki/File:Aix_sponsa_-_Wood_Duck_XC63109.mp3", "from": "wikimedia commons"},
+    "common kingfisher": {"len": 10.1, "kind": "", "by": "Marie-Lan Taÿ Pamart", "lic": "CC BY-SA 4.0", "page": "https://commons.wikimedia.org/wiki/File:Alcedo_atthis_-_Common_Kingfisher_XC476785.mp3", "from": "wikimedia commons"},
+    "mallard": {"len": 10.3, "kind": "", "by": "Jonathon Jongsma", "lic": "CC BY-SA 3.0", "page": "https://commons.wikimedia.org/wiki/File:Anas_platyrhynchos_-_Mallard_XC112828.mp3", "from": "wikimedia commons"},
+    "ruby-throated hummingbird": {"len": 11.6, "kind": "", "by": "Jonathon Jongsma", "lic": "CC BY-SA 3.0", "page": "https://commons.wikimedia.org/wiki/File:Archilochus_colubris_-_Ruby-throated_Hummingbird_XC109597.mp3", "from": "wikimedia commons"},
+    "atlantic puffin": {"len": 10.2, "kind": "", "by": "an unknown recordist", "lic": "CC BY-SA 4.0", "page": "https://commons.wikimedia.org/wiki/File:Atlantic_Puffin_(Fratercula_arctica)_(W1CDR0001416_BD3).ogg", "from": "wikimedia commons"},
+    "northern cardinal": {"len": 10.1, "kind": "", "by": "Jonathon Jongsma", "lic": "CC BY-SA 3.0", "page": "https://commons.wikimedia.org/wiki/File:Cardinalis_cardinalis_-_Northern_Cardinal_XC112830.mp3", "from": "wikimedia commons"},
+    "blue jay": {"len": 10.2, "kind": "", "by": "Jonathon Jongsma", "lic": "CC BY-SA 3.0", "page": "https://commons.wikimedia.org/wiki/File:Cyanocitta_cristata_-_Blue_Jay_XC108404.mp3", "from": "wikimedia commons"},
+    "mute swan": {"len": 11.5, "kind": "", "by": "Alexander Kürthy", "lic": "CC BY-SA 3.0", "page": "https://commons.wikimedia.org/wiki/File:Cygnus_olor_-_Mute_Swan_XC307509.mp3", "from": "wikimedia commons"},
+    "great blue heron": {"len": 10.0, "kind": "", "by": "G. McGrane", "lic": "public domain", "page": "https://commons.wikimedia.org/wiki/File:Great_Blue_Heron1.ogg", "from": "wikimedia commons"},
+    "north island brown kiwi": {"len": 10.0, "kind": "song", "by": "Department of Conservation", "lic": "CC BY 4.0", "page": "https://commons.wikimedia.org/wiki/File:Kiwi_Male_North_Island_brown_kiwi_song.ogg", "from": "wikimedia commons"},
+    "peregrine falcon": {"len": 10.0, "kind": "call", "by": "Sharadapte", "lic": "CC BY-SA 4.0", "page": "https://commons.wikimedia.org/wiki/File:Peregrine_falcon_call_recorded_in_February_2010_at_Yana,_Karnataka.wav", "from": "wikimedia commons"},
+    "pileated woodpecker": {"len": 12.0, "kind": "", "by": "G. McGrane", "lic": "public domain", "page": "https://commons.wikimedia.org/wiki/File:Pileated_Woodpecker.ogg", "from": "wikimedia commons"},
+    "black-capped chickadee": {"len": 11.0, "kind": "", "by": "Jonathon Jongsma", "lic": "CC BY-SA 3.0", "page": "https://commons.wikimedia.org/wiki/File:Poecile_atricapillus_-_Black-capped_Chickadee_XC70185.mp3", "from": "wikimedia commons"},
+    "greater roadrunner": {"len": 10.0, "kind": "bill clatter", "by": "Bob DuHamel", "lic": "CC BY-SA 3.0", "page": "https://commons.wikimedia.org/wiki/File:Roadrunner_Clatter.ogg", "from": "wikimedia commons"},
+    "scarlet macaw": {"len": 10.2, "kind": "", "by": "Ganesh Mohan T", "lic": "CC BY-SA 4.0", "page": "https://commons.wikimedia.org/wiki/File:Scarlet_macaw_01.wav", "from": "wikimedia commons"},
+    "european starling": {"len": 10.1, "kind": "", "by": "Marie-Lan Taÿ Pamart", "lic": "CC BY-SA 4.0", "page": "https://commons.wikimedia.org/wiki/File:Sturnus_vulgaris_-_Common_Starling_XC516954.mp3", "from": "wikimedia commons"},
+    "toco toucan": {"len": 10.0, "kind": "call", "by": "Fabrício Grigolin", "lic": "CC BY 4.0", "page": "https://commons.wikimedia.org/wiki/File:Toco_Toucan_call_(Ramphastos_toco).ogg", "from": "wikimedia commons"},
+    "american robin": {"len": 12.3, "kind": "", "by": "radrat", "lic": "CC BY-SA 4.0", "page": "https://commons.wikimedia.org/wiki/File:Turdus_migratorius_-_American_Robin_XC566186.mp3", "from": "wikimedia commons"},
+    "barn owl": {"len": 11.4, "kind": "", "by": "Joost van Bruggen", "lic": "CC BY-SA 4.0", "page": "https://commons.wikimedia.org/wiki/File:Tyto_alba_-_Western_Barn_Owl_XC432000.mp3", "from": "wikimedia commons"},
+    "bald eagle": {"len": 10.0, "kind": "", "by": "NPS & MSU Acoustic Atlas/Jennifer Jerrett", "lic": "public domain", "page": "https://commons.wikimedia.org/wiki/File:Yellowstone_sound_library_-_Bald_Eagle_-_003.mp3", "from": "wikimedia commons"},
+    "cedar waxwing": {"len": 10.2, "kind": "", "by": "Jonathon Jongsma", "lic": "CC BY-SA 3.0", "page": "https://commons.wikimedia.org/wiki/File:Bombycilla_cedrorum_-_Cedar_Waxwing_XC107623.mp3", "from": "wikimedia commons"},
+    "great horned owl": {"len": 10.3, "kind": "hoots", "by": "Michael & Katie LaTour", "lic": "CC BY-SA 4.0", "page": "https://commons.wikimedia.org/wiki/File:Bubo_virginianus_-_Great_Horned_Owl_XC450919.mp3", "from": "wikimedia commons"},
+    "budgerigar": {"len": 4.7, "kind": "chirps", "by": "mary905", "lic": "public domain", "page": "https://commons.wikimedia.org/wiki/File:Budgerigar_chirping.ogg", "from": "wikimedia commons"},
+    "red-tailed hawk": {"len": 2.1, "kind": "", "by": "Jonathon Jongsma", "lic": "CC BY-SA 3.0", "page": "https://commons.wikimedia.org/wiki/File:Buteo_jamaicensis_-_Red-tailed_Hawk_XC71575.mp3", "from": "wikimedia commons"},
+    "common raven": {"len": 12.1, "kind": "", "by": "Jonathon Jongsma", "lic": "CC BY-SA 3.0", "page": "https://commons.wikimedia.org/wiki/File:Corvus_corax_-_Northern_Raven_XC101590.mp3", "from": "wikimedia commons"},
+    "laughing kookaburra": {"len": 10.0, "kind": "", "by": "Powys, V.", "lic": "CC BY 3.0", "page": "https://commons.wikimedia.org/wiki/File:Dacelo_novaeguineae_ANWC_X00520.opus", "from": "wikimedia commons"},
+    "emu": {"len": 10.0, "kind": "", "by": "Lütgens, Hans", "lic": "CC BY-SA 3.0", "page": "https://commons.wikimedia.org/wiki/File:Dromaius_novaehollandiae_Lue0043_03.wav", "from": "wikimedia commons"},
+    "common loon": {"len": 10.0, "kind": "", "by": "Jonathon Jongsma", "lic": "CC BY-SA 3.0", "page": "https://commons.wikimedia.org/wiki/File:Gavia_immer_-_Common_Loon_XC139388.mp3", "from": "wikimedia commons"},
+    "sandhill crane": {"len": 12.6, "kind": "", "by": "Jonathon Jongsma", "lic": "CC BY-SA 3.0", "page": "https://commons.wikimedia.org/wiki/File:Grus_canadensis_-_Sandhill_Crane_XC111489.mp3", "from": "wikimedia commons"},
+    "baltimore oriole": {"len": 10.8, "kind": "", "by": "Jonathon Jongsma", "lic": "CC BY-SA 3.0", "page": "https://commons.wikimedia.org/wiki/File:Icterus_galbula_-_Baltimore_Oriole_XC101614.mp3", "from": "wikimedia commons"},
+    "kea": {"len": 10.0, "kind": "song", "by": "an unknown recordist", "lic": "CC BY 4.0", "page": "https://commons.wikimedia.org/wiki/File:Kea-song.wav", "from": "wikimedia commons"},
+    "wild turkey": {"len": 13.0, "kind": "", "by": "Jonathon Jongsma", "lic": "CC BY-SA 3.0", "page": "https://commons.wikimedia.org/wiki/File:Meleagris_gallopavo_-_Wild_Turkey_XC134744.ogg", "from": "wikimedia commons"},
+    "northern mockingbird": {"len": 11.7, "kind": "", "by": "David Illig", "lic": "CC BY-SA 3.0", "page": "https://commons.wikimedia.org/wiki/File:Mimus_polyglottos_Northern_Mockingbird.ogg", "from": "wikimedia commons"},
+    "osprey": {"len": 10.2, "kind": "", "by": "an unknown recordist", "lic": "CC BY-SA 4.0", "page": "https://commons.wikimedia.org/wiki/File:Osprey_(Pandion_haliaetus)_(W1CDR0001434_BD8).ogg", "from": "wikimedia commons"},
+    "painted bunting": {"len": 10.3, "kind": "", "by": "AMANTEDESAURIOS", "lic": "CC BY 4.0", "page": "https://commons.wikimedia.org/wiki/File:Passerina_ciris_1435567.ogg", "from": "wikimedia commons"},
+    "indian peafowl": {"len": 8.7, "kind": "call", "by": "Ke4roh", "lic": "public domain", "page": "https://commons.wikimedia.org/wiki/File:Pavo_cristatus_(call).ogg", "from": "wikimedia commons"},
+    "eastern bluebird": {"len": 10.0, "kind": "", "by": "Jonathon Jongsma", "lic": "CC BY-SA 4.0", "page": "https://commons.wikimedia.org/wiki/File:Sialia_sialis_-_Eastern_Bluebird_XC179669.mp3", "from": "wikimedia commons"},
+    "american goldfinch": {"len": 12.9, "kind": "", "by": "Kevin Hood", "lic": "CC BY-SA 4.0", "page": "https://commons.wikimedia.org/wiki/File:Spinus_tristis_-_American_Goldfinch_XC483030.mp3", "from": "wikimedia commons"},
+    "arctic tern": {"len": 10.1, "kind": "", "by": "Doug Hynes", "lic": "CC BY-SA 4.0", "page": "https://commons.wikimedia.org/wiki/File:Sterna_paradisaea_-_Arctic_Tern_XC564600.mp3", "from": "wikimedia commons"},
+    "herring gull": {"len": 10.0, "kind": "", "by": "Sonothèque ADVL", "lic": "CC0", "page": "https://commons.wikimedia.org/wiki/File:XC707075_-_European_Herring_Gull_-_Larus_argentatus.mp3", "from": "wikimedia commons"},
+    "red-winged blackbird": {"len": 12.0, "kind": "", "by": "radrat", "lic": "CC BY-SA 4.0", "page": "https://commons.wikimedia.org/wiki/File:Agelaius_phoeniceus_-_Red-winged_Blackbird_XC551977.mp3", "from": "wikimedia commons"},
+    "andean condor": {"len": 7.6, "kind": "call", "by": "Fernando Castro", "lic": "CC BY 4.0", "page": "https://commons.wikimedia.org/wiki/File:Andean_Condor_call_(Vultur_gryphus).ogg", "from": "wikimedia commons"},
+    "great egret": {"len": 6.1, "kind": "", "by": "Jonathon Jongsma", "lic": "CC BY-SA 3.0", "page": "https://commons.wikimedia.org/wiki/File:Ardea_alba_-_Great_Egret_XC131650.ogg", "from": "wikimedia commons"},
+    "canada goose": {"len": 10.0, "kind": "", "by": "Antonio Xeira", "lic": "CC BY-SA 3.0", "page": "https://commons.wikimedia.org/wiki/File:Branta_canadensis_-_Canada_Goose_XC388771.mp3", "from": "wikimedia commons"},
+    "killdeer": {"len": 10.0, "kind": "", "by": "Jonathon Jongsma", "lic": "CC BY-SA 3.0", "page": "https://commons.wikimedia.org/wiki/File:Charadrius_vociferus_-_Killdeer_XC62728.mp3", "from": "wikimedia commons"},
+    "american kestrel": {"len": 11.5, "kind": "", "by": "Niels Krabbe", "lic": "CC BY-SA 4.0", "page": "https://commons.wikimedia.org/wiki/File:Falco_sparverius_-_American_Kestrel_XC250844.mp3", "from": "wikimedia commons"},
+    "barn swallow": {"len": 10.0, "kind": "", "by": "Jonathon Jongsma", "lic": "CC BY-SA 3.0", "page": "https://commons.wikimedia.org/wiki/File:Hirundo_rustica_-_Barn_Swallow_XC83449.mp3", "from": "wikimedia commons"},
+    "belted kingfisher": {"len": 10.5, "kind": "", "by": "Jonathon Jongsma", "lic": "CC BY-SA 3.0", "page": "https://commons.wikimedia.org/wiki/File:Megaceryle_alcyon_-_Belted_Kingfisher_XC132872.ogg", "from": "wikimedia commons"},
+    "red-headed woodpecker": {"len": 10.0, "kind": "", "by": "Jonathon Jongsma", "lic": "CC BY-SA 4.0", "page": "https://commons.wikimedia.org/wiki/File:Melanerpes_erythrocephalus_-_Red-headed_Woodpecker_XC254603.mp3", "from": "wikimedia commons"},
+    "eurasian magpie": {"len": 10.0, "kind": "", "by": "Benoît Van Hecke", "lic": "CC BY-SA 4.0", "page": "https://commons.wikimedia.org/wiki/File:Pica_pica_-_Eurasian_Magpie_XC537413.mp3", "from": "wikimedia commons"},
+    "willow ptarmigan": {"len": 10.0, "kind": "", "by": "an unknown recordist", "lic": "CC BY-SA 4.0", "page": "https://commons.wikimedia.org/wiki/File:Red_Grouse_(Lagopus_lagopus)_(W1CDR0001407_BD28).ogg", "from": "wikimedia commons"},
+    "resplendent quetzal": {"len": 10.4, "kind": "song", "by": "Leander Khil", "lic": "CC BY 4.0", "page": "https://commons.wikimedia.org/wiki/File:Resplendent_Quetzal_song_(Pharomachrus_mocinno).ogg", "from": "wikimedia commons"},
+    "house wren": {"len": 11.5, "kind": "", "by": "radrat", "lic": "CC BY-SA 4.0", "page": "https://commons.wikimedia.org/wiki/File:Troglodytes_aedon_-_House_Wren_XC558995.mp3", "from": "wikimedia commons"},
+    "tufted titmouse": {"len": 10.9, "kind": "call", "by": "U. S. Fish and Wildlife Service", "lic": "public domain", "page": "https://commons.wikimedia.org/wiki/File:Tufted_Titmouse_call.ogg", "from": "wikimedia commons"},
+    "hoopoe": {"len": 10.1, "kind": "", "by": "Alexander Kurthy", "lic": "CC BY-SA 4.0", "page": "https://commons.wikimedia.org/wiki/File:Upupa_epops_-_Eurasian_Hoopoe_XC108366.mp3", "from": "wikimedia commons"},
+    "bar-tailed godwit": {"len": 10.4, "kind": "", "by": "Lauri Hallikainen", "lic": "CC BY-SA 4.0", "page": "https://commons.wikimedia.org/wiki/File:XC234849-Default_Project.ogg", "from": "wikimedia commons"},
+    "mourning dove": {"len": 13.0, "kind": "", "by": "Jonathon Jongsma", "lic": "CC BY-SA 3.0", "page": "https://commons.wikimedia.org/wiki/File:Zenaida_macroura_-_Mourning_Dove_XC128006.ogg", "from": "wikimedia commons"},
+    "snowy owl": {"len": 11.5, "kind": "hoots", "by": "Tero Linjama", "lic": "CC BY-NC-SA 4.0", "page": "https://xeno-canto.org/343144", "from": "xeno-canto"},
+    "emperor penguin": {"len": 10.0, "kind": "song", "by": "Santiago Imberti", "lic": "CC BY-NC-SA 4.0", "page": "https://xeno-canto.org/689246", "from": "xeno-canto"},
+    "secretary bird": {"len": 10.7, "kind": "", "by": "Niall Perrins", "lic": "CC BY-NC-SA 4.0", "page": "https://xeno-canto.org/391856", "from": "xeno-canto"},
+    "common ostrich": {"len": 4.5, "kind": "boom", "by": "Michael Chiappone", "lic": "CC BY-NC-SA 4.0", "page": "https://xeno-canto.org/845942", "from": "xeno-canto"},
+    "sulphur-crested cockatoo": {"len": 10.0, "kind": "call", "by": "Mengshuai Ge", "lic": "CC BY-NC-SA 4.0", "page": "https://xeno-canto.org/1071627", "from": "xeno-canto"},
+    "burrowing owl": {"len": 11.2, "kind": "song", "by": "Thomas Beverly", "lic": "CC BY-NC-SA 4.0", "page": "https://xeno-canto.org/382734", "from": "xeno-canto"},
+    "mandarin duck": {"len": 12.6, "kind": "call", "by": "Alan Dalton", "lic": "CC BY-NC-SA 4.0", "page": "https://xeno-canto.org/953769", "from": "xeno-canto"},
+    "brown pelican": {"len": 10.0, "kind": "call", "by": "Judith PRIAM", "lic": "CC BY-NC-SA 4.0", "page": "https://xeno-canto.org/357928", "from": "xeno-canto"},
+    "scarlet ibis": {"len": 11.7, "kind": "call", "by": "Dante Buzzetti", "lic": "CC BY-NC-SA 4.0", "page": "https://xeno-canto.org/1016019", "from": "xeno-canto"},
+    "bee hummingbird": {"len": 10.0, "kind": "song", "by": "Catriona Leven", "lic": "CC BY-NC-SA 4.0", "page": "https://xeno-canto.org/318392", "from": "xeno-canto"},
+    "wandering albatross": {"len": 10.5, "kind": "call", "by": "Greg McLachlan", "lic": "CC BY-NC-SA 4.0", "page": "https://xeno-canto.org/883164", "from": "xeno-canto"},
+    "american flamingo": {"len": 10.4, "kind": "call", "by": "Justin Watts", "lic": "CC BY-SA 4.0", "page": "https://xeno-canto.org/737280", "from": "xeno-canto"}
+  };
+
+  /* ---------- drawing helpers, in the weathercrab marker style ---------- */
+  const INK = "#2b2522", CRAB = "#d97757";
+  const n1 = (v) => Math.round(v * 10) / 10;
+  const d = (strs, ...vals) => strs.reduce((a, s, i) => a + s + (i < vals.length ? (typeof vals[i] === "number" ? n1(vals[i]) : vals[i]) : ""), "");
+  const stk = (w = 3.2) => `stroke="${INK}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round"`;
+  const sw = (w) => (w === 0 ? "" : w != null ? stk(w) : stk());
+  const P = (p, fill, w) => `<path d="${p}" fill="${fill}" ${sw(w)}/>`;
+  const R = (x, y, w, h, fill, rx = 3, s) => `<rect x="${n1(x)}" y="${n1(y)}" width="${n1(w)}" height="${n1(h)}" rx="${rx}" fill="${fill}" ${sw(s)}/>`;
+  const E = (cx, cy, rx, ry, fill, s, rot) => `<ellipse cx="${n1(cx)}" cy="${n1(cy)}" rx="${n1(rx)}" ry="${n1(ry)}" fill="${fill}" ${sw(s)}${rot ? ` transform="rotate(${n1(rot)} ${n1(cx)} ${n1(cy)})"` : ""}/>`;
+  const Ci = (cx, cy, r, fill, s) => `<circle cx="${n1(cx)}" cy="${n1(cy)}" r="${n1(r)}" fill="${fill}" ${sw(s)}/>`;
+  const L = (p, w = 2.2, c = INK, extra = "") => `<path d="${p}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" ${extra}/>`;
+  const thick = (p, w, c, o = 2.6) => L(p, w + o, INK) + L(p, w, c);
+  const G = (tr, inner, cls) => `<g${cls ? ` class="${cls}"` : ""} transform="${tr}">${inner}</g>`;
+  const mirror = (s) => `<g transform="matrix(-1 0 0 1 240 0)">${s}</g>`;
+  function mix(a, b, t) {
+    const p = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+    const x = p(a), y = p(b);
+    return "#" + x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, "0")).join("");
+  }
+  const shade = (c, t) => (t < 0 ? mix(c, "#000000", -t) : mix(c, "#ffffff", t));
+
+  /* ---------- the crab: weathercrab's mascot, now birdwatching in a bucket hat ---------- */
+  const HAT = "#c9b98f", HAT_BAND = "#5f7350", BINO = "#3b3330";
+  const crabLegs = () => [60, 84, 144, 168].map((x, i) => `<g class="leg l${i}">${R(x, 156, 12, 32, CRAB, 2)}${R(x - 3.5, 183, 19, 11, "#6b5240", 5)}</g>`).join("");
+  const raised = () => P("M186 118 L198 118 L198 100 L222 100 L222 142 L186 142 Z", CRAB);
+  const bucketHat = () => G("translate(0 -14)",
+    P("M78 76 Q78 40 120 38 Q162 40 162 76 Z", HAT) +
+    `<path d="M78.5 62 Q120 57 161.5 62 L161.8 71 Q120 66 78.2 71 Z" fill="${HAT_BAND}"/>` +
+    P("M48 84 Q120 62 192 84 Q188 93 174 88 Q120 76 66 88 Q52 93 48 84 Z", HAT));
+  const binoculars = () => `<g class="bino">` +
+    R(94, 96, 52, 14, "#4a403a", 5) + R(112, 84, 16, 12, "#4a403a", 3) +
+    R(52, 84, 44, 38, BINO, 10) + R(144, 84, 44, 38, BINO, 10) +
+    Ci(74, 103, 12, "#7fa6c9") + Ci(166, 103, 12, "#7fa6c9") +
+    L("M67 98 Q70 94 75 94 M159 98 Q162 94 167 94", 2.2, "#ffffff", 'opacity=".8"') +
+    `</g>`;
+  const grips = () => R(182, 98, 22, 18, CRAB, 5) + mirror(R(182, 98, 22, 18, CRAB, 5));
+
+  /* the crab, in its own 240-wide space with feet at y 194 */
+  function crabSVG(opts = {}) {
+    const s = crabLegs() + raised() + mirror(raised()) + R(48, 70, 144, 96, CRAB, 5) +
+      L("M106 136 Q120 146 134 136", 3) + bucketHat() + binoculars() + grips();
+    const filt = opts.flat ? "" : ' filter="url(#wob)"';
+    return `<g class="crab" data-move="${opts.move || "sway"}"><g${filt}><g class="move"><g class="breathe">${s}</g></g></g></g>`;
+  }
+
+  /* ---------- where the bird is: perches and the ground around the crab ---------- */
+  const GROUND = { grass: "#3f4a37", snow: "#dfe7ea", sand: "#b9a27a", dirt: "#5b5046" };
+  const PERCH = {
+    branch: { at: [240, 113] },
+    trunk: { at: [228, 162] },
+    ground: { at: [240, 214] },
+    rock: { at: [240, 182] },
+    water: { at: [234, 212], ground: "grass" },
+    marsh: { at: [238, 214] },
+    ice: { at: [238, 198], ground: "snow" },
+    snow: { at: [240, 214], ground: "snow" },
+    sand: { at: [240, 214], ground: "sand" },
+    air: { at: [259, 122] }
+  };
+  function perchBack(p) {
+    const g = GROUND[PERCH[p].ground || "grass"];
+    let s = R(6, 210, 308, 16, g, 4) + L("M30 211 L26 205 M34 211 L35 204 M118 211 L114 205 M298 211 L301 205", 1.6, shade(g, p === "snow" || p === "ice" ? -0.18 : 0.18));
+    if (p === "branch") {
+      s += thick("M326 104 Q270 108 188 124", 9, "#7a5a40", 3) + thick("M286 108 Q298 90 314 84", 4, "#7a5a40", 3) +
+        P("M314 84 Q326 70 340 78 Q328 92 314 84 Z", "#6f9a57", 2) + P("M300 94 Q302 76 316 70 Q316 88 300 94 Z", "#7fae63", 2) +
+        P("M196 122 Q186 108 172 112 Q180 126 196 122 Z", "#6f9a57", 2);
+    } else if (p === "trunk") {
+      s += R(190, -10, 36, 226, "#6d5240", 6) + L("M200 20 Q203 40 199 60 M214 84 Q211 104 215 124 M202 150 Q205 170 201 190 M216 10 Q213 24 216 38", 1.8, "#4f3a2d") +
+        thick("M190 60 Q172 54 160 40", 5, "#6d5240", 3);
+    } else if (p === "rock") {
+      s += P("M172 214 Q176 188 204 180 L266 176 Q296 182 302 214 Z", "#706963") + L("M214 186 Q232 182 252 184 M270 194 L282 200", 1.8, "#58524d");
+    } else if (p === "water") {
+      s += P("M140 207 Q230 199 318 207 L318 226 L140 226 Z", "#2f4b63", 0);
+    } else if (p === "marsh") {
+      s += P("M150 206 Q234 200 318 206 L318 222 L150 222 Z", "#2f4b63", 0) +
+        thick("M296 214 Q292 170 300 128 M306 214 Q308 176 314 150 M286 214 Q282 186 276 166", 2.4, "#6f8a4f", 2.4) +
+        R(296, 122, 8, 20, "#7a5236", 4, 2) + R(310, 144, 7, 17, "#7a5236", 3.5, 2);
+    } else if (p === "ice") {
+      s += P("M140 207 Q230 201 318 207 L318 226 L140 226 Z", "#2f4b63", 0) + P("M160 214 L170 196 L292 192 L306 214 Z", "#eef3f5") + L("M196 202 L232 200 M262 205 L284 204", 1.6, "#c4d2da");
+    } else if (p === "snow") {
+      s += P("M170 214 Q200 198 236 204 Q270 196 300 214 Z", "#eef3f5");
+    } else if (p === "air") {
+      s += thick("M218 214 Q206 160 216 104", 3, "#6f9a57") + P("M216 150 Q232 140 238 124 Q222 128 216 150 Z", "#7fae63", 2) +
+        P("M212 104 Q206 96 210 86 L224 84 Q228 94 222 104 Z", "#c84b3c", 2) + P("M210 86 Q200 80 204 74 Q212 76 216 84 M224 84 Q236 78 232 72 Q222 74 218 84", "#e0674f", 2);
+    }
+    return s;
+  }
+  function perchFront(p, at) {
+    if (p === "water" || p === "ice") {
+      return P("M140 208 Q151 204 162 208 T184 208 T206 208 T228 208 T250 208 T272 208 T294 208 T318 208 L318 226 L140 226 Z", "#3f6788", 2) +
+        `<g fill="none" stroke="#9cc3e0" stroke-width="1.6"><ellipse class="ripple" cx="${at[0] - 20}" cy="212" rx="18" ry="3"/><ellipse class="ripple r2" cx="${at[0] + 34}" cy="214" rx="16" ry="2.6"/></g>`;
+    }
+    if (p === "marsh") return P("M150 207 Q161 203 172 207 T194 207 T216 207 T238 207 T260 207 T282 207 T318 207 L318 222 L150 222 Z", "rgba(63,103,136,.78)", 2);
+    return "";
+  }
+
+  /* the next bird, still in its egg */
+  function eggSVG() {
+    return `<svg viewBox="136 24 184 202" aria-hidden="true"><g filter="url(#wobS)">${R(146, 210, 168, 16, GROUND.grass, 4)}` +
+      P("M178 210 Q176 194 196 186 L264 186 Q284 194 282 210 Z", "#6d5a46") + L("M186 196 L274 196 M190 204 L270 204", 1.6, "#5a4a3a") +
+      P("M230 92 Q256 92 262 140 Q266 184 230 190 Q194 184 198 140 Q204 92 230 92 Z", "#efe6d6") +
+      L("M206 136 L216 128 L224 138 L234 126 L244 136 L254 128", 2.2) +
+      `<text x="230" y="172" text-anchor="middle" font-size="30" font-weight="700" fill="#a8a097" font-family="Comic Neue, Comic Sans MS, cursive">?</text></g></svg>`;
+  }
+  /* ---------- birds: one parametric sketch, facing the crab (left), feet at 0,0 ----------
+     each archetype sets the build; each bird sets colors (c), markings (m) and any overrides (x) */
+  const BW = 2;
+  const ARCH = {
+    song:   { bx: 4, by: -30, bw: 25, bh: 16, tilt: 26, hx: -17, hy: -48, hr: 13, beak: "thin", bl: 11, tail: "wedge", tl: 22, ta: 30, legs: "perch", lx: [-3, 6], move: "bob", perch: "branch" },
+    hummer: { bx: 4, by: -14, bw: 15, bh: 7, tilt: 28, hx: -10, hy: -25, hr: 8, beak: "needle", bl: 22, tail: "fork", tl: 10, ta: 26, legs: "none", wings: "blur", move: "hover", perch: "air" },
+    kingf:  { bx: 4, by: -30, bw: 22, bh: 15, tilt: 34, hx: -12, hy: -52, hr: 16, beak: "dagger", bl: 24, crest: "shaggy", tail: "stub", tl: 14, ta: 32, legs: "perch", lx: [-1, 6], move: "bob", perch: "branch" },
+    wood:   { bx: 12, by: -28, bw: 24, bh: 12, tilt: 76, hx: 4, hy: -58, hr: 12, beak: "chisel", bl: 14, tail: "stiff", tl: 18, ta: 6, legs: "cling", move: "peck", perch: "trunk" },
+    raptor: { bx: 6, by: -40, bw: 28, bh: 17, tilt: 62, hx: -6, hy: -74, hr: 14, beak: "hook", bl: 12, tail: "long", tl: 30, ta: 12, legs: "feather", lx: [-2, 8], move: "still", perch: "branch" },
+    parrot: { bx: 6, by: -40, bw: 24, bh: 16, tilt: 66, hx: -4, hy: -72, hr: 15, beak: "parrot", bl: 13, tail: "long", tl: 46, ta: 6, legs: "perch", lx: [-1, 7], move: "bob", perch: "branch" },
+    duck:   { bx: 8, by: -10, bw: 36, bh: 15, tilt: -4, hx: -30, hy: -40, hr: 12, neck: [-30, -18], nw: 12, beak: "duck", bl: 14, tail: "wedge", tl: 12, ta: -28, legs: "none", move: "float", perch: "water" },
+    wader:  { bx: 12, by: -84, bw: 26, bh: 14, tilt: 14, hx: -24, hy: -126, hr: 9, neck: [-2, -112], nw: 8, beak: "dagger", bl: 28, tail: "stub", tl: 12, ta: 22, legs: "long", lx: [4, 14], move: "sway", perch: "marsh" },
+    shore:  { bx: 6, by: -32, bw: 28, bh: 14, tilt: 14, hx: -22, hy: -48, hr: 12, beak: "thin", bl: 14, tail: "wedge", tl: 18, ta: 8, legs: "thin", lx: [-2, 8], move: "bob", perch: "sand" },
+    ground: { bx: 10, by: -50, bw: 34, bh: 24, tilt: 10, hx: -32, hy: -80, hr: 9, neck: [-30, -56], nw: 9, beak: "cone", bl: 9, tail: "wedge", tl: 20, ta: -30, legs: "thick", lx: [-2, 12], move: "peck", perch: "ground" },
+    runner: { bx: 4, by: -40, bw: 26, bh: 11, tilt: 6, hx: -26, hy: -56, hr: 10, beak: "dagger", bl: 18, crest: "shaggy", tail: "long", tl: 46, ta: -36, legs: "thin", lx: [-4, 8], move: "bob", perch: "sand" },
+    ratite: { bx: 16, by: -98, bw: 38, bh: 28, tilt: 8, hx: -26, hy: -172, hr: 9, neck: [-30, -122], nw: 7, beak: "flat", bl: 12, tail: "puff", legs: "long", lx: [6, 22], lw: 5, move: "sway", perch: "sand" },
+    kiwi:   { bx: 6, by: -24, bw: 28, bh: 21, tilt: -8, hx: -20, hy: -30, hr: 11, beak: "curved", bl: 32, tail: "none", legs: "thick", lx: [0, 12], move: "peck", perch: "ground" },
+    owl:    { front: "owl", bw: 24, bh: 28, by: -32, hr: 22, move: "still", perch: "branch" },
+    penguin:{ front: "penguin", bw: 30, bh: 56, by: -60, hr: 19, move: "sway", perch: "ice" }
+  };
+
+  /* beaks: base at 0,0, pointing left; h is half the base height */
+  function beakSVG(t, l, h, c, b) {
+    const tip = (b && b.tip) || "";
+    switch (t) {
+      case "cone": return P(d`M0 ${-h} Q${-l * .5} ${-h * .7} ${-l} ${h * .15} Q${-l * .5} ${h * .7} 0 ${h} Z`, c, BW) + L(d`M${-l * .15} ${h * .1} L${-l * .8} ${h * .15}`, 1.2, INK, 'opacity=".55"');
+      case "thin": return P(d`M0 ${-h} L${-l} ${h * .25} L0 ${h} Z`, c, BW);
+      case "dagger": return P(d`M0 ${-h} L${-l} ${h * .15} L0 ${h} Z`, c, BW) + L(d`M0 ${h * .1} L${-l * .85} ${h * .15}`, 1.2, INK, 'opacity=".5"') + (tip ? P(d`M${-l * .62} ${-h * .4} L${-l} ${h * .15} L${-l * .62} ${h * .55} Z`, tip, 0) : "");
+      case "chisel": return P(d`M0 ${-h} L${-l} ${-h * .1} L${-l} ${h * .25} L0 ${h} Z`, c, BW);
+      case "gull": return P(d`M0 ${-h} L${-l * .8} ${-h * .55} Q${-l} ${-h * .5} ${-l} ${h * .2} L${-l * .8} ${h * .45} L0 ${h} Z`, c, BW) + Ci(-l * .82, h * .32, h * .32, "#d24b3a", 0);
+      case "hook": return P(d`M0 ${-h} Q${-l * .9} ${-h * 1.15} ${-l} ${h * 1.3} Q${-l * .78} ${h * .55} ${-l * .5} ${h * .5} L0 ${h} Z`, c, BW) + P(d`M2 ${-h * 1.05} L${-l * .28} ${-h * .95} L${-l * .28} ${h * .85} L2 ${h}`, (b && b.cere) || "#f3c95c", BW);
+      case "parrot": return P(d`M0 ${-h * 1.1} Q${-l * 1.15} ${-h * 1.3} ${-l * .9} ${h * 1.5} Q${-l * .72} ${h * .7} ${-l * .32} ${h * .3} L0 ${h * .1} Z`, c, BW) + P(d`M0 ${h * .1} L${-l * .32} ${h * .3} Q${-l * .5} ${h * 1.1} 0 ${h * 1.05} Z`, (b && b.lower) || shade(c, -.25), BW);
+      case "duck": return P(d`M0 ${-h} L${-l * .8} ${-h * .55} Q${-l} ${-h * .5} ${-l} ${h * .05} Q${-l} ${h * .55} ${-l * .8} ${h * .6} L0 ${h} Z`, c, BW) + Ci(-l * .82, -h * .12, h * .28, shade(c, -.35), 0);
+      case "flat": return P(d`M0 ${-h} L${-l * .85} ${-h * .5} Q${-l} ${-h * .3} ${-l} ${h * .1} Q${-l} ${h * .45} ${-l * .85} ${h * .5} L0 ${h} Z`, c, BW);
+      case "needle": return thick(d`M0 0 L${-l} ${l * .07}`, 2, c, 2.2);
+      case "curved": return thick(d`M0 0 Q${-l * .55} ${-l * .04} ${-l} ${l * .38}`, h, c, 2.4);
+      case "upcurve": return thick(d`M0 0 Q${-l * .6} ${l * .06} ${-l} ${-l * .1}`, h, c, 2.4) + thick(d`M${-l * .65} ${-l * .02} Q${-l * .85} ${-l * .06} ${-l} ${-l * .1}`, h, tip || shade(c, -.5), 0);
+      case "big": return P(d`M0 ${-h} Q${-l * .55} ${-h * 1.3} ${-l} ${-h * .1} Q${-l * .96} ${h * .55} ${-l * .72} ${h * .6} L0 ${h} Z`, c, BW) +
+        (tip ? P(d`M${-l * .78} ${-h * .78} Q${-l * .92} ${-h * .55} ${-l} ${-h * .1} Q${-l * .96} ${h * .55} ${-l * .72} ${h * .6} L${-l * .78} ${-h * .78} Z`, tip, BW) : "") + L(d`M0 ${h * .25} Q${-l * .5} ${h * .45} ${-l * .92} ${h * .1}`, 1.4, INK, 'opacity=".6"');
+      case "puffin": return P(d`M0 ${-h} Q${-l * .75} ${-h * .85} ${-l} ${h * .05} Q${-l * .75} ${h * .85} 0 ${h} Z`, c, BW) +
+        P(d`M${-l * .02} ${-h * .95} L${-l * .3} ${-h * .82} L${-l * .3} ${h * .82} L${-l * .02} ${h * .95} Z`, "#4f5d66", BW) + L(d`M${-l * .45} ${-h * .7} Q${-l * .52} 0 ${-l * .45} ${h * .7}`, 1.8, "#f3c95c");
+      case "pouch": return P(d`M0 ${-h} L${-l} ${-h * .25} L${-l} ${h * .3} L0 ${h * .4} Z`, c, BW) + P(d`M0 ${h * .4} L${-l * .95} ${h * .3} Q${-l * .55} ${h * 3.2} 0 ${h * 2.2} Z`, (b && b.lower) || shade(c, -.15), BW);
+      case "bent": return P(d`M0 ${-h} L${-l * .5} ${-h * .85} Q${-l * .78} ${-h * .7} ${-l * .86} ${h * 1.6} L${-l * .74} ${h * 1.8} Q${-l * .56} ${h * 1.05} 0 ${h} Z`, c, BW) +
+        P(d`M${-l * .66} ${-h * .78} Q${-l * .78} ${-h * .7} ${-l * .86} ${h * 1.6} L${-l * .74} ${h * 1.8} Q${-l * .66} ${h * 1.3} ${-l * .6} ${h * 1.1} Z`, tip || INK, BW);
+      case "shoe": return P(d`M0 ${-h} L${-l * .82} ${-h * .78} Q${-l} ${-h * .7} ${-l * .98} ${-h * .1} L${-l * .86} ${h * .15} Q${-l * .78} ${h * .95} ${-l * .4} ${h * 1.1} L0 ${h} Z`, c, BW) + L(d`M${-l * .1} ${h * .1} L${-l * .82} ${h * .2}`, 1.4, INK, 'opacity=".5"');
+      default: return "";
+    }
+  }
+
+  /* tails: attached at the back of the body, pointing along +x of their own frame */
+  function tailPath(t, l, w) {
+    switch (t) {
+      case "wedge": return d`M0 ${-w} L${l} ${-w * 1.25} Q${l + 3} 0 ${l} ${w * 1.25} L0 ${w} Z`;
+      case "long": return d`M0 ${-w} L${l} ${-w * .85} Q${l + 4} 0 ${l} ${w * .85} L0 ${w} Z`;
+      case "fork": return d`M0 ${-w} L${l} ${-w * 1.7} L${l * .62} 0 L${l} ${w * 1.7} L0 ${w} Z`;
+      case "stub": return d`M0 ${-w} L${l} ${-w * .8} L${l} ${w * .8} L0 ${w} Z`;
+      case "stiff": return d`M0 ${-w} L${l} ${-w * .55} L${l + 5} 0 L${l} ${w * .55} L0 ${w} Z`;
+      case "round": return d`M0 ${-w} Q${l * 1.1} ${-w * 1.8} ${l} 0 Q${l * 1.1} ${w * 1.8} 0 ${w} Z`;
+      default: return "";
+    }
+  }
+
+  let UID = 0;
+  function sideBird(b) {
+    const o = { ...ARCH[b.a], ...(b.x || {}) };
+    const c = b.c, m = b.m || {};
+    const body = c.b, belly = c.u || body, head = c.h || body, wing = c.w || shade(body, -0.12), tail = c.t || wing;
+    const beakC = c.k || "#e9b94a", legC = c.l || "#8b6a52";
+    const id = "bc" + (++UID);
+    const th = (o.tilt * Math.PI) / 180, cs = Math.cos(th), sn = Math.sin(th);
+    const rot = (x, y) => [o.bx + x * cs - y * sn, o.by + x * sn + y * cs];
+    const { bw, bh, hx, hy, hr } = o;
+    let s = "";
+
+    /* tails that sit behind everything */
+    if (o.tail === "fan") {
+      const [fx, fy] = rot(bw * .45, -bh * .35), r = o.tl;
+      let rays = "";
+      for (let i = 0; i <= 8; i++) { const a = Math.PI * (1.05 + i * .1125); rays += d`M${fx} ${fy} L${fx + Math.cos(a) * r} ${fy + Math.sin(a) * r} `; }
+      s += P(d`M${fx - r} ${fy + 6} A${r} ${r} 0 0 1 ${fx + r} ${fy + 6} Z`, tail, BW) +
+        L(d`M${fx - r * .86} ${fy - r * .3} A${r * .9} ${r * .9} 0 0 1 ${fx + r * .86} ${fy - r * .3}`, 4, m.fanband || "#efe6d6") + L(rays, 1.2, INK, 'opacity=".45"');
+    } else if (o.tail === "train") {
+      const [fx, fy] = rot(bw * .4, -bh * .2), r = o.tl;
+      s += P(d`M${fx - r * .95} ${fy + 16} A${r} ${r} 0 0 1 ${fx + r * .95} ${fy + 16} Z`, tail, BW);
+      for (let ring = 0; ring < 3; ring++) {
+        const rr = r * (.42 + ring * .2), nEye = 5 + ring * 2;
+        for (let i = 0; i < nEye; i++) {
+          const a = Math.PI * (1.08 + (i * .84) / (nEye - 1));
+          const ex = fx + Math.cos(a) * rr, ey = fy + Math.sin(a) * rr;
+          s += E(ex, ey, 5.2, 6.4, "#e9c46a", 1.4, (a * 180) / Math.PI + 90) + E(ex, ey, 3.4, 4.2, "#3f8f8a", 0, (a * 180) / Math.PI + 90) + Ci(ex, ey, 1.9, "#1e3f6e", 0);
+        }
+      }
+    } else if (o.tail === "puff") {
+      const [fx, fy] = rot(bw * .9, -bh * .2);
+      s += P(d`M${fx - 6} ${fy - 10} Q${fx + 8} ${fy - 26} ${fx + 20} ${fy - 12} Q${fx + 30} ${fy - 2} ${fx + 18} ${fy + 8} Q${fx + 6} ${fy + 14} ${fx - 4} ${fy + 6} Z`, tail, BW);
+    } else if (o.tail === "streamers") {
+      const [ax, ay] = rot(bw * .75, 0), a = o.tilt + o.ta;
+      s += G(d`translate(${ax} ${ay}) rotate(${a})`, thick(d`M0 -2 Q${o.tl * .5} -6 ${o.tl} 4`, 4, tail, 2.4) + thick(d`M0 2 Q${o.tl * .45} 4 ${o.tl * .9} 12`, 4, shade(tail, .12), 2.4) + P(tailPath("stub", 14, bh * .35), tail, BW));
+    } else if (o.tail !== "none") {
+      const [ax, ay] = rot(bw * .75, -bh * .05), w = o.tw || bh * .38;
+      s += G(d`translate(${ax} ${ay}) rotate(${o.tilt + o.ta})`, P(tailPath(o.tail, o.tl, w), tail, BW) + L(d`M3 0 L${o.tl * .85} 0`, 1.2, INK, 'opacity=".35"') + (m.tailtip ? P(d`M${o.tl * .78} ${-w * 1.2} L${o.tl + 2} ${-w * 1.25} Q${o.tl + 5} 0 ${o.tl + 2} ${w * 1.25} L${o.tl * .78} ${w * 1.2} Z`, m.tailtip, 0) : ""));
+    }
+
+    /* hummingbird wing, far side */
+    if (o.wings === "blur") { const [wx, wy] = rot(bw * .05, -bh * .7); s += G(d`translate(${wx} ${wy}) rotate(-58)`, `<g class="blur">${E(0, -15, 4.5, 15, "rgba(214,226,232,.5)", 1.4)}</g>`); }
+
+    /* legs */
+    const legTop = o.by + bh * .3;
+    const lx = o.lx || [-2, 6];
+    if (o.legs === "perch") s += lx.map((x, i) => thick(d`M${x} ${legTop} L${x} -1`, 2, i ? legC : shade(legC, -.15), 2.2) + L(d`M${x} 0 L${x - 5} 1.5 M${x} 0 L${x + 3} 2`, 2.2)).join("");
+    else if (o.legs === "thin") s += lx.map((x, i) => thick(d`M${x} ${legTop} L${x} 0`, 2.2, i ? legC : shade(legC, -.15), 2.2) + thick(d`M${x + 3} 0 L${x - 7} 0`, 1.8, legC, 2)).join("");
+    else if (o.legs === "long") { const lw = o.lw || 2.4; s += lx.map((x, i) => { const kx = x + 6, ky = legTop + (0 - legTop) * .48; return thick(d`M${x} ${legTop} L${kx} ${ky} L${x} -1`, lw, i ? legC : shade(legC, -.15), 2.4) + thick(d`M${x + 4} 0 L${x - 10} 0`, lw * .8, legC, 2); }).join(""); }
+    else if (o.legs === "thick") s += lx.map((x, i) => thick(d`M${x} ${legTop} L${x} -1`, 4.5, i ? legC : shade(legC, -.15), 2.4) + thick(d`M${x + 4} 0 L${x - 9} 0 M${x} 0 L${x - 5} 0`, 2.4, legC, 2)).join("");
+    else if (o.legs === "feather") s += lx.map((x) => E(x + 2, legTop + 4, 7, 9, belly, BW) + thick(d`M${x - 1} ${-6} L${x - 1} -1`, 3, "#f3c95c", 2) + L(d`M${x - 1} 0 L${x - 7} 1 M${x - 1} 0 L${x + 4} 1.5`, 2.6)).join("");
+    else if (o.legs === "cling") s += thick(d`M${o.bx - 4} ${o.by + 10} L-2 -1`, 2.2, legC, 2.2) + thick(d`M${o.bx - 2} ${o.by - 4} L0 -14`, 2.2, legC, 2.2) + L("M-2 0 L-7 -2 M0 -14 L-5 -16", 2.2);
+
+    /* neck, under the body and head */
+    const [n0x, n0y] = rot(-bw * .7, -bh * .3);
+    if (o.neck) s += thick(d`M${n0x} ${n0y} Q${o.neck[0]} ${o.neck[1]} ${hx + hr * .2} ${hy + hr * .3}`, o.nw, c.n || head, BW * 2);
+
+    /* body, belly and body markings, in the body's own frame */
+    let inner = E(-bw * .3, bh * .58, bw * .85, bh * .72, belly, 0);
+    if (m.chest) inner += E(-bw * .78, bh * .12, bw * .42, bh * .82, m.chest, 0);
+    if (m.flank) inner += E(bw * .12, bh * .4, bw * .55, bh * .42, m.flank, 0);
+    if (m.stripe) inner += E(-bw * .05, bh * .1, bw * .9, bh * .1, m.stripe, 0);
+    if (m.band) inner += E(-bw * .55, bh * .25, bw * .22, bh * .9, m.band, 0);
+    if (m.spots) inner += [[-.7, .3], [-.5, .55], [-.3, .35], [-.55, .05], [-.15, .62], [-.05, .3], [-.35, .8], [.1, .55]].map(([x, y]) => Ci(bw * x, bh * y, Math.max(1.4, bh * .09), m.spots, 0)).join("");
+    if (m.speckle) inner += [[-.7, -.2], [-.5, .4], [-.3, -.4], [-.2, .1], [0, -.6], [.1, .3], [.3, -.2], [.45, .4], [-.45, -.7], [.25, .7], [-.65, .65], [.6, -.3]].map(([x, y]) => Ci(bw * x, bh * y, 1.3, m.speckle, 0)).join("");
+    if (m.bars) inner += [-.15, .15, .45, .75].map((y) => L(d`M${-bw * .95} ${bh * y} Q${-bw * .5} ${bh * y + 2.5} ${-bw * .05} ${bh * y}`, 1.6, m.bars)).join("");
+    let wingS = "";
+    if (o.wings !== "none") {
+      const wr = o.wingRot ?? 6;
+      wingS = E(bw * .12, -bh * .1, bw * .7, bh * .62, wing, BW, wr);
+      if (m.patch) wingS += E(-bw * .22, -bh * .22, bw * .24, bh * .3, m.patch, BW, wr);
+      if (m.wingbars) wingS += L(d`M${-bw * .2} ${-bh * .38} Q${bw * .05} ${-bh * .1} ${-bw * .05} ${bh * .3} M${bw * .05} ${-bh * .42} Q${bw * .28} ${-bh * .12} ${bw * .18} ${bh * .3}`, 2, m.wingbars);
+      if (m.wingtip) wingS += P(d`M${bw * .55} ${-bh * .45} Q${bw * .9} ${-bh * .1} ${bw * .82} ${bh * .1} Q${bw * .6} ${bh * .2} ${bw * .5} ${bh * .05} Z`, m.wingtip, 0);
+      wingS += L(d`M${bw * .38} ${-bh * .2} L${bw * .7} ${-bh * .02} M${bw * .3} ${bh * .05} L${bw * .62} ${bh * .2}`, 1.3, INK, 'opacity=".45"');
+    }
+    s += G(d`translate(${o.bx} ${o.by}) rotate(${o.tilt})`,
+      `<defs><clipPath id="${id}c"><ellipse rx="${bw}" ry="${bh}"/></clipPath></defs>` +
+      E(0, 0, bw, bh, body, 0) + `<g clip-path="url(#${id}c)">${inner}</g>` + E(0, 0, bw, bh, "none", BW) + wingS);
+
+    if (o.wings === "blur") { const [wx, wy] = rot(bw * .2, -bh * .6); s += G(d`translate(${wx} ${wy}) rotate(-42)`, `<g class="blur">${E(0, -14, 4.5, 14, "rgba(232,240,244,.55)", 1.4)}</g>`); }
+    if (m.collar && o.neck) { const t = .3, qx = (1 - t) ** 2 * n0x + 2 * (1 - t) * t * o.neck[0] + t * t * hx, qy = (1 - t) ** 2 * n0y + 2 * (1 - t) * t * o.neck[1] + t * t * hy; s += E(qx, qy, o.nw * .62, 2.4, m.collar, 1.2); }
+
+    /* crest, behind the head */
+    const cc = c.c || head, k = o.cs || 1;
+    if (o.crest === "point") s += P(d`M${hx - hr * .35} ${hy - hr * .82} Q${hx + hr * .15} ${hy - hr * 1.8 * k} ${hx + hr * 1.1 * k} ${hy - hr * 1.7 * k} Q${hx + hr * .7} ${hy - hr * .95} ${hx + hr * .88} ${hy - hr * .3} Z`, cc, BW);
+    else if (o.crest === "shaggy") s += P(d`M${hx - hr * .45} ${hy - hr * .82} L${hx + hr * .05} ${hy - hr * 1.5 * k} L${hx + hr * .32} ${hy - hr * 1.0} L${hx + hr * .82} ${hy - hr * 1.42 * k} L${hx + hr * .8} ${hy - hr * .82} L${hx + hr * 1.3 * k} ${hy - hr * .9 * k} L${hx + hr * .9} ${hy - hr * .2} Z`, cc, BW);
+    else if (o.crest === "fan") { for (let i = 0; i < 6; i++) { const a = -150 + i * 22, len = hr * 1.7 * k; s += G(d`translate(${hx + hr * .1} ${hy - hr * .5}) rotate(${a + 90})`, E(0, -len / 2, hr * .2, len / 2, cc, BW) + (m.cresttip ? E(0, -len + hr * .2, hr * .17, hr * .22, m.cresttip, 0) : "")); } }
+    else if (o.crest === "quills") { for (let i = 0; i < 5; i++) s += thick(d`M${hx + hr * .5} ${hy - hr * .3} Q${hx + hr * 1.3} ${hy - hr * (.7 + i * .25)} ${hx + hr * (1.7 + i * .12)} ${hy - hr * (.2 + i * .42)}`, 1.6, cc, 2); }
+    else if (o.crest === "topknot") { for (let i = 0; i < 5; i++) { const ex = hx - hr * .25 + i * hr * .22, ey = hy - hr * 2.1 + Math.abs(i - 2) * hr * .12; s += L(d`M${hx + (i - 2) * hr * .08} ${hy - hr * .9} L${ex} ${ey}`, 1.3) + Ci(ex, ey, hr * .17, cc, 1.2); } }
+
+    /* head and head markings */
+    s += `<defs><clipPath id="${id}h"><circle cx="${n1(hx)}" cy="${n1(hy)}" r="${hr}"/></clipPath></defs>`;
+    let hm = "";
+    if (m.throat) hm += E(hx - hr * .15, hy + hr * 1.0, hr * .8, hr * .55, m.throat, 0);
+    if (m.cheek) hm += E(hx + hr * .08, hy + hr * .3, hr * .55, hr * .34, m.cheek, 0);
+    if (m.nape) hm += E(hx + hr * .85, hy + hr * .1, hr * .45, hr * .9, m.nape, 0);
+    if (m.cap) hm += R(hx - hr - 1, hy - hr - 1, hr * 2 + 2, hr * .85 + 1, m.cap, 0, 0);
+    if (m.face) hm += E(hx - hr * .95, hy + hr * .18, hr * .58, hr * .58, m.face, 0);
+    if (m.mask) hm += E(hx - hr * .45, hy - hr * .12, hr * .85, hr * .3, m.mask, 0);
+    if (m.stripe2) hm += E(hx + hr * .2, hy - hr * .15, hr * 1.1, hr * .13, m.stripe2, 0);
+    if (m.brow) hm += E(hx - hr * .05, hy - hr * .5, hr * .72, hr * .13, m.brow, 0);
+    if (m.bare) hm += E(hx - hr * .42, hy + hr * .02, hr * .52, hr * .48, m.bare, 0);
+    if (m.earpatch) hm += E(hx + hr * .25, hy + hr * .1, hr * .38, hr * .62, m.earpatch, 0, -20);
+    s += Ci(hx, hy, hr, head, 0) + `<g clip-path="url(#${id}h)">${hm}</g>` + Ci(hx, hy, hr, "none", BW);
+
+    /* wattles and snoods (turkeys), under and over the beak */
+    const bx0 = hx - hr * .82, by0 = hy + (o.bdy ?? hr * .12);
+    if (m.wattle) s += P(d`M${bx0 + 2} ${by0 + 2} Q${bx0 - 2} ${by0 + 16} ${bx0 + 6} ${by0 + 18} Q${bx0 + 10} ${by0 + 10} ${bx0 + 6} ${by0 + 2} Z`, m.wattle, BW);
+    s += G(d`translate(${bx0} ${by0})`, beakSVG(o.beak, o.bl, o.bh2 || hr * (o.beak === "cone" ? .42 : o.beak === "big" ? .78 : o.beak === "parrot" ? .62 : o.beak === "puffin" ? .72 : o.beak === "pouch" ? .3 : o.beak === "shoe" ? .7 : o.beak === "duck" ? .36 : o.beak === "curved" || o.beak === "upcurve" ? 2.6 / hr : .3), beakC, { tip: c.kt, cere: c.cere, lower: c.kl }));
+    if (m.snood) s += thick(d`M${bx0 + 1} ${by0 - hr * .3} Q${bx0 - 6} ${by0 - 2} ${bx0 - 4} ${by0 + 8}`, 2.6, m.snood, 2);
+
+    /* eye */
+    const ex = hx - hr * .3 + (o.exo || 0), ey = hy - hr * .2, er = Math.max(1.9, hr * .16);
+    let eye = "";
+    if (m.ring) eye += Ci(ex, ey, er * 1.9, m.ring, 0);
+    if (c.e) eye += Ci(ex, ey, er * 1.45, c.e, 1.2) + Ci(ex, ey, er * .8, INK, 0);
+    else eye += Ci(ex, ey, er, INK, 0);
+    eye += Ci(ex - er * .32, ey - er * .35, er * .34, "#ffffff", 0);
+    s += `<g class="beye">${eye}</g>`;
+    return s;
+  }
+
+  /* owls and penguins look straight at you */
+  function frontBird(b) {
+    const o = { ...ARCH[b.a], ...(b.x || {}) };
+    const c = b.c, m = b.m || {};
+    const id = "bc" + (++UID);
+    const { bw, bh, by, hr } = o;
+    let s = "";
+    if (o.front === "owl") {
+      const hy = by - bh * .95, legC = c.l || "#f3c95c";
+      s += E(-bw * .95, by + 2, bw * .38, bh * .8, c.w || shade(c.b, -.1), BW, 12) + E(bw * .95, by + 2, bw * .38, bh * .8, c.w || shade(c.b, -.1), BW, -12);
+      s += `<defs><clipPath id="${id}c"><ellipse cx="0" cy="${by}" rx="${bw}" ry="${bh}"/></clipPath></defs>` + E(0, by, bw, bh, c.b, 0);
+      let inner = E(0, by + bh * .3, bw * .7, bh * .85, c.u || c.b, 0);
+      if (m.bars) inner += [-.2, .1, .4, .7].map((y) => L(d`M${-bw * .6} ${by + bh * y} Q0 ${by + bh * y + 3} ${bw * .6} ${by + bh * y}`, 1.6, m.bars, 'stroke-dasharray="5 4"')).join("");
+      if (m.spots) inner += [[-.45, -.1], [.1, -.25], [.5, 0], [-.2, .25], [.3, .35], [-.5, .5], [.05, .6], [.5, .7]].map(([x, y]) => E(bw * x, by + bh * y, 2.6, 1.7, m.spots, 0)).join("");
+      s += `<g clip-path="url(#${id}c)">${inner}</g>` + E(0, by, bw, bh, "none", BW);
+      if (o.ears) s += P(d`M${-hr * .85} ${hy - hr * .55} L${-hr * .95} ${hy - hr * 1.5} L${-hr * .3} ${hy - hr * .85} Z`, c.h || c.b, BW) + P(d`M${hr * .85} ${hy - hr * .55} L${hr * .95} ${hy - hr * 1.5} L${hr * .3} ${hy - hr * .85} Z`, c.h || c.b, BW);
+      s += Ci(0, hy, hr, c.h || c.b, BW);
+      if (m.throat) s += E(0, hy + hr * .82, hr * .5, hr * .22, m.throat, 0);
+      s += o.heart
+        ? P(d`M0 ${hy - hr * .55} Q${-hr * .55} ${hy - hr * 1.05} ${-hr * .85} ${hy - hr * .45} Q${-hr * 1.05} ${hy + hr * .35} 0 ${hy + hr * .9} Q${hr * 1.05} ${hy + hr * .35} ${hr * .85} ${hy - hr * .45} Q${hr * .55} ${hy - hr * 1.05} 0 ${hy - hr * .55} Z`, c.f || "#f6f1e8", BW)
+        : Ci(-hr * .42, hy + hr * .02, hr * .5, c.f || shade(c.h || c.b, .2), 1.6) + Ci(hr * .42, hy + hr * .02, hr * .5, c.f || shade(c.h || c.b, .2), 1.6);
+      if (m.brow) s += L(d`M${-hr * .8} ${hy - hr * .5} Q${-hr * .4} ${hy - hr * .75} ${-hr * .08} ${hy - hr * .3} M${hr * .8} ${hy - hr * .5} Q${hr * .4} ${hy - hr * .75} ${hr * .08} ${hy - hr * .3}`, 2.4, m.brow);
+      const er = hr * (o.heart ? .17 : .27);
+      const eyes = [-1, 1].map((sd) => (c.e ? Ci(sd * hr * .42, hy + hr * .02, er, c.e, 1.4) + Ci(sd * hr * .42, hy + hr * .02, er * .52, INK, 0) : Ci(sd * hr * .42, hy + hr * .02, er, INK, 0)) + Ci(sd * hr * .42 - er * .3, hy - er * .3, er * .26, "#ffffff", 0)).join("");
+      s += `<g class="beye">${eyes}</g>`;
+      s += P(d`M${-hr * .14} ${hy + hr * .22} L${hr * .14} ${hy + hr * .22} L0 ${hy + hr * .55} Z`, c.k || "#5a4a3a", 1.6);
+      if (b.p === "branch" || !b.p) s += [-8, 8].map((x) => L(d`M${x - 5} 1 L${x - 5} -4 M${x} 1 L${x} -5 M${x + 5} 1 L${x + 5} -4`, 2.6, legC === "#f3c95c" ? "#3b3330" : legC)).join("");
+      else s += [-9, 9].map((x) => thick(d`M${x} ${by + bh * .8} L${x} -1`, o.leg ? 3 : 4, legC, 2.2) + L(d`M${x} 0 L${x - 6} 1 M${x} 0 L${x + 5} 1`, 2.4)).join("");
+    } else {
+      const hy = by - bh * .92;
+      s += E(-bw * .95, by + bh * .05, bw * .22, bh * .55, c.w || c.b, BW, 18) + E(bw * .95, by + bh * .05, bw * .22, bh * .55, c.w || c.b, BW, -18);
+      s += [-10, 10].map((x) => E(x, -2, 9, 4, c.l || "#3b3330", BW)).join("");
+      s += `<defs><clipPath id="${id}c"><ellipse cx="0" cy="${by}" rx="${bw}" ry="${bh}"/></clipPath></defs>` + E(0, by, bw, bh, c.b, 0) +
+        `<g clip-path="url(#${id}c)">${E(0, by + bh * .18, bw * .7, bh * .9, c.u || "#f6f1e8", 0)}${m.chest ? E(0, by - bh * .62, bw * .62, bh * .22, m.chest, 0) : ""}</g>` + E(0, by, bw, bh, "none", BW);
+      s += Ci(0, hy, hr, c.h || c.b, BW);
+      if (m.earpatch) s += E(-hr * .82, hy + hr * .45, hr * .28, hr * .5, m.earpatch, 1.4, 20) + E(hr * .82, hy + hr * .45, hr * .28, hr * .5, m.earpatch, 1.4, -20);
+      s += `<g class="beye">${[-1, 1].map((sd) => Ci(sd * hr * .38, hy - hr * .1, 2.2, "#121214", 0) + Ci(sd * hr * .38 - .7, hy - hr * .1 - .8, .8, "#ffffff", 0)).join("")}</g>`;
+      s += P(d`M${-hr * .2} ${hy + hr * .2} L${hr * .2} ${hy + hr * .2} L0 ${hy + hr * 1.05} Z`, c.k || "#3b3330", 1.6) + L(d`M${-hr * .1} ${hy + hr * .32} L0 ${hy + hr * .8}`, 2, c.kt || "#e2804f");
+    }
+    return s;
+  }
+
+  const birdShape = (b) => (ARCH[b.a].front ? frontBird(b) : sideBird(b));
+  const perchOf = (b) => b.p || ARCH[b.a].perch;
+  const moveOf = (b) => (b.x && b.x.move) || ARCH[b.a].move;
+
+  /* the whole scene: ground, perch, the crab on the left, the bird on the right */
+  function sceneSVG(b, opts = {}) {
+    const p = perchOf(b), at = PERCH[p].at, sc = b.s || 1;
+    const flat = !!opts.flat;
+    const bird = `<g class="bird" data-move="${moveOf(b)}"><g transform="translate(${at[0]} ${at[1]}) scale(${sc})"><g class="bmove"><g${opts.land ? ' class="land"' : ""}><g${flat ? "" : ' filter="url(#wobB)"'}>${birdShape(b)}</g></g></g></g></g>`;
+    const back = `<g${flat ? "" : ' filter="url(#wobS)"'}>${perchBack(p)}</g>`;
+    const front = perchFront(p, at);
+    if (opts.mini) return `<svg viewBox="136 24 184 202" role="img" aria-label="${esc(b.n)}">${back}${bird}${front}</svg>`;
+    const crab = G("translate(10 107.3) scale(.55)", crabSVG({ flat, move: opts.hop ? "hop" : "sway" }));
+    return `<svg class="scene" viewBox="0 0 320 240" role="img" aria-label="the crab watching a ${esc(b.n)} through binoculars">${back}${crab}${bird}${front}</svg>`;
+  }
+  /* ---------- the half-day clock: a new bird at 12am and 12pm local time ---------- */
+  const N = BIRDS.length;
+  const slotOf = (t) => Math.round(Date.UTC(t.getFullYear(), t.getMonth(), t.getDate()) / 864e5) * 2 + (t.getHours() >= 12 ? 1 : 0);
+  function slotStart(n) {
+    const day = new Date(Math.floor(n / 2) * 864e5);
+    return new Date(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate(), (((n % 2) + 2) % 2) * 12);
+  }
+  const EPOCH = slotOf(new Date(2026, 0, 1, 0));
+  const birdIdx = (n) => (((n - EPOCH) % N) + N) % N;
+  const birdAt = (n) => BIRDS[birdIdx(n)];
+  const factAt = (n) => { const b = birdAt(n), lap = Math.floor((n - EPOCH) / N); return b.f[((lap % b.f.length) + b.f.length) % b.f.length]; };
+  const BACK = 13;
+
+  const WEEK = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+  const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+  const half = (n) => ((((n % 2) + 2) % 2) ? "pm" : "am");
+  function dayLabel(n, cur) {
+    const dd = Math.floor(n / 2) - Math.floor(cur / 2), t = slotStart(n);
+    if (dd === 0) return "today";
+    if (dd === -1) return "yesterday";
+    return `${WEEK[t.getDay()]}, ${MONTHS[t.getMonth()]} ${t.getDate()}`;
+  }
+  const shortSlot = (n, cur) => (n === cur ? "now" : `${Math.floor(n / 2) === Math.floor(cur / 2) ? "today" : Math.floor(n / 2) === Math.floor(cur / 2) - 1 ? "yest." : WEEK[slotStart(n).getDay()]} ${half(n)}`);
+
+  /* ---------- sizes ---------- */
+  function sizeText(b) {
+    let v;
+    if (state.unit === "cm") v = b.cm >= 100 ? `${(b.cm / 100).toFixed(2).replace(/0$/, "")} m` : `${b.cm} cm`;
+    else {
+      const inch = b.cm / 2.54;
+      if (inch < 30) v = `${inch < 6 ? Math.round(inch * 2) / 2 : Math.round(inch)} in`;
+      else { const ft = Math.floor(Math.round(inch) / 12), rest = Math.round(inch) - ft * 12; v = rest ? `${ft} ft ${rest} in` : `${ft} ft`; }
+    }
+    return b.ht ? `stands ${v} tall` : `${v} long${b.note ? ` ${b.note}` : ""}`;
+  }
+
+  /* ---------- state ---------- */
+  const state = { n: slotOf(new Date()), view: 0, unit: saved.unit === "cm" ? "cm" : "in", seen: new Set(Array.isArray(saved.seen) ? saved.seen.filter(Number.isFinite) : []), activeHolder: $("#holderA") };
+  state.view = state.n;
+  function persist() { store.set({ unit: state.unit, seen: [...state.seen].sort((a, b) => a - b).slice(-400) }); }
+  function markSeen() { if (!state.seen.has(state.n)) { state.seen.add(state.n); persist(); } }
+  const lifeCount = () => new Set([...state.seen].map(birdIdx)).size;
+
+  /* ---------- render ---------- */
+  const PIN = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21 3 3 10.5l7.6 2.9L13.5 21z"/></svg>`;
+  const RULER = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><rect x="1.5" y="5" width="13" height="6" rx="1.2"/><path d="M4.5 5v2.4M7 5v3.2M9.5 5v2.4M12 5v3.2" stroke-linecap="round"/></svg>`;
+  function swapScene(html) {
+    const next = state.activeHolder.id === "holderA" ? $("#holderB") : $("#holderA");
+    next.innerHTML = html;
+    next.classList.add("on");
+    state.activeHolder.classList.remove("on");
+    state.activeHolder = next;
+  }
+  function render(anim) {
+    const n = state.view, b = birdAt(n), cur = state.n;
+    if (snd.for && snd.for !== b.n) { audio.pause(); snd.for = null; }
+    swapScene(sceneSVG(b, { land: anim && !reduced, hop: anim && n === cur && !reduced }));
+    document.documentElement.style.setProperty("--glow", b.gl);
+    $("#birdName").textContent = b.n;
+    $("#birdSci").textContent = b.sci;
+    renderChips();
+    renderListen();
+    $("#factText").textContent = factAt(n);
+    $("#factNum").textContent = `· NO. ${n - EPOCH + 1}`;
+    $("#whenDay").textContent = dayLabel(n, cur);
+    $("#whenSlot").textContent = `(${half(n)} bird)`;
+    $("#prevBtn").disabled = n <= cur - BACK;
+    $("#nextBtn").disabled = n >= cur;
+    renderNote();
+    setFx(snd.for === b.n && !audio.paused ? "notes" : fxFor(b));
+  }
+  function renderChips() {
+    const b = birdAt(state.view);
+    $("#chips").innerHTML = `<span class="chip">${PIN}<span>${esc(b.w)}</span></span><span class="chip">${RULER}<span>${esc(sizeText(b))}</span></span>`;
+  }
+  function renderNote() {
+    const note = $("#note");
+    if (state.view === state.n) note.textContent = "a new bird lands at 12am and 12pm your time";
+    else note.innerHTML = `looking back at ${esc(dayLabel(state.view, state.n))}'s ${half(state.view)} bird · <button id="nowBtn">back to the current bird</button>`;
+  }
+  function go(n) {
+    n = Math.max(state.n - BACK, Math.min(state.n, n));
+    if (n === state.view) return;
+    state.view = n;
+    render(false);
+    $("#live").textContent = `${dayLabel(n, state.n)}, ${half(n)}: ${birdAt(n).n}`;
+  }
+  $("#prevBtn").addEventListener("click", () => go(state.view - 1));
+  $("#nextBtn").addEventListener("click", () => go(state.view + 1));
+  $("#note").addEventListener("click", (e) => { if (e.target.closest("#nowBtn")) go(state.n); });
+  document.addEventListener("keydown", (e) => {
+    if (openSheet) { if (e.key === "Escape") closeSheet(); return; }
+    if (e.target.closest && e.target.closest("input, textarea")) return;
+    if (e.key === "ArrowLeft") go(state.view - 1);
+    else if (e.key === "ArrowRight") go(state.view + 1);
+  });
+
+  function renderUnit() {
+    $("#unitIn").setAttribute("aria-pressed", state.unit === "in");
+    $("#unitCm").setAttribute("aria-pressed", state.unit === "cm");
+  }
+  function setUnit(u) { if (u === state.unit) return; state.unit = u; persist(); renderUnit(); renderChips(); }
+  $("#unitIn").addEventListener("click", () => setUnit("in"));
+  $("#unitCm").addEventListener("click", () => setUnit("cm"));
+
+  /* ---------- the countdown ---------- */
+  const RING = 2 * Math.PI * 19;
+  const pad = (v) => String(v).padStart(2, "0");
+  function countParts(ms) {
+    const s = Math.max(0, Math.ceil(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+    return { h, m, sec };
+  }
+  function tick() {
+    const now = new Date(), cur = slotOf(now);
+    if (cur !== state.n) {
+      const follow = state.view === state.n;
+      state.n = cur;
+      markSeen();
+      if (follow) { state.view = cur; render(true); $("#live").textContent = `a new bird landed: ${birdAt(cur).n}`; }
+      else { state.view = Math.max(state.view, cur - BACK); render(false); }
+      if (openSheet === $("#logSheet")) renderLog();
+    }
+    const start = slotStart(cur), end = slotStart(cur + 1);
+    const left = end - now, prog = Math.min(1, Math.max(0, (now - start) / (end - start)));
+    const { h, m, sec } = countParts(left);
+    $("#count").innerHTML = `${h}<span class="u">h</span>${pad(m)}<span class="u">m</span>${pad(sec)}<span class="u">s</span>`;
+    $("#timer").setAttribute("aria-label", `next bird lands in ${h} hours ${m} minutes`);
+    $("#ringFill").setAttribute("stroke-dashoffset", (RING * (1 - prog)).toFixed(2));
+    $("#ringHand").setAttribute("transform", `rotate(${(prog * 360).toFixed(1)} 24 24)`);
+    const nc = $("#nextCount");
+    if (nc) nc.textContent = `in ${h}:${pad(m)}:${pad(sec)}`;
+  }
+  function loop() { tick(); setTimeout(loop, 1000 - (Date.now() % 1000) + 8); }
+
+  /* ---------- fx: song notes, drifting feathers, snow ---------- */
+  function fxFor(b) {
+    const p = perchOf(b);
+    if (p === "snow" || p === "ice") return "snow";
+    if (["song", "parrot", "kingf", "hummer"].includes(b.a) && b.n !== "common raven") return "notes";
+    return "feathers";
+  }
+  const fx = { cv: $("#fx"), ctx: null, mode: null, parts: [], raf: 0, last: 0, w: 0, h: 0 };
+  fx.ctx = fx.cv.getContext("2d");
+  function sizeFx() {
+    const r = fx.cv.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1);
+    fx.w = r.width; fx.h = r.height;
+    fx.cv.width = Math.round(r.width * dpr); fx.cv.height = Math.round(r.height * dpr);
+    fx.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  function spawn(p, initial) {
+    if (fx.mode === "notes") {
+      p.x = fx.w * (.58 + Math.random() * .2); p.y = fx.h * (.3 + Math.random() * .16);
+      p.v = 12 + Math.random() * 10; p.ph = Math.random() * 6.28; p.life = 0; p.max = 2.6 + Math.random() * 1.4;
+      p.delay = initial ? Math.random() * 3 : .4 + Math.random() * 2.2; p.g = Math.random() < .5 ? "♪" : "♫"; p.sz = 12 + Math.random() * 5;
+    } else if (fx.mode === "feathers") {
+      p.x = fx.w * (.1 + Math.random() * .85); p.y = initial ? Math.random() * fx.h : -12;
+      p.v = 9 + Math.random() * 9; p.ph = Math.random() * 6.28; p.len = 7 + Math.random() * 5;
+    } else {
+      p.x = Math.random() * fx.w; p.y = initial ? Math.random() * fx.h : -8;
+      p.v = 16 + Math.random() * 20; p.r = 1.2 + Math.random() * 1.8; p.ph = Math.random() * 6.28;
+    }
+    return p;
+  }
+  function setFx(mode) {
+    if (reduced) mode = null;
+    if (mode === fx.mode) return;
+    fx.mode = mode;
+    sizeFx();
+    const count = mode === "notes" ? 4 : mode === "feathers" ? 5 : mode === "snow" ? 34 : 0;
+    fx.parts = Array.from({ length: count }, () => spawn({}, true));
+    if (mode && !fx.raf) { fx.last = performance.now(); fx.raf = requestAnimationFrame(frame); }
+    if (!mode) fx.ctx.clearRect(0, 0, fx.w, fx.h);
+  }
+  function frame(now) {
+    const dt = Math.min(.05, (now - fx.last) / 1000); fx.last = now;
+    const c = fx.ctx; c.clearRect(0, 0, fx.w, fx.h);
+    if (!fx.mode) { fx.raf = 0; return; }
+    if (fx.mode === "notes") {
+      c.textAlign = "center";
+      for (const p of fx.parts) {
+        if (p.delay > 0) { p.delay -= dt; continue; }
+        p.life += dt; p.y -= p.v * dt; p.ph += dt * 3;
+        if (p.life > p.max) { spawn(p); continue; }
+        const a = Math.sin(Math.PI * (p.life / p.max));
+        c.globalAlpha = a * .75; c.fillStyle = "#efe9e1"; c.font = `700 ${p.sz}px "Comic Neue", "Comic Sans MS", sans-serif`;
+        c.fillText(p.g, p.x + Math.sin(p.ph) * 5, p.y);
+      }
+      c.globalAlpha = 1;
+    } else if (fx.mode === "feathers") {
+      c.lineCap = "round";
+      for (const p of fx.parts) {
+        p.y += p.v * dt; p.ph += dt * 1.6;
+        if (p.y > fx.h + 14) spawn(p);
+        const x = p.x + Math.sin(p.ph) * 14, ang = Math.sin(p.ph) * .7 + .4;
+        c.save(); c.translate(x, p.y); c.rotate(ang);
+        c.fillStyle = "rgba(239,233,225,.32)"; c.beginPath(); c.ellipse(0, 0, p.len, p.len * .32, 0, 0, 6.283); c.fill();
+        c.strokeStyle = "rgba(239,233,225,.5)"; c.lineWidth = 1; c.beginPath(); c.moveTo(-p.len - 3, 0); c.lineTo(p.len, 0); c.stroke();
+        c.restore();
+      }
+    } else {
+      c.fillStyle = "rgba(240,245,255,.85)";
+      for (const p of fx.parts) {
+        p.y += p.v * dt; p.ph += dt * 1.3;
+        const x = p.x + Math.sin(p.ph) * 6;
+        if (p.y > fx.h + 6) spawn(p);
+        c.beginPath(); c.arc(x, p.y, p.r, 0, 6.283); c.fill();
+      }
+    }
+    fx.raf = requestAnimationFrame(frame);
+  }
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden && fx.raf) { cancelAnimationFrame(fx.raf); fx.raf = 0; }
+    else if (!document.hidden) { if (fx.mode && !fx.raf) { fx.last = performance.now(); fx.raf = requestAnimationFrame(frame); } tick(); }
+  });
+  addEventListener("resize", () => { if (fx.mode) sizeFx(); });
+
+  /* ---------- the bird's own voice: a short field recording per bird, played only when tapped ---------- */
+  const QUIET = { shoebill: "shoebills hardly make a sound" };
+  const PLAY_IC = `<svg viewBox="0 0 10 10" fill="currentColor" aria-hidden="true"><path d="M2.6 1.2 8.7 5 2.6 8.8z"/></svg>`;
+  const STOP_IC = `<svg viewBox="0 0 10 10" fill="currentColor" aria-hidden="true"><rect x="2" y="2" width="6" height="6" rx="1"/></svg>`;
+  const HUSH_IC = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6h2.5l3.5-3v10l-3.5-3H2.5z M11 6l3.5 4 M14.5 6 11 10"/></svg>`;
+  const audio = new Audio();
+  audio.preload = "none";
+  const snd = { for: null, raf: 0, failed: null };
+  const stageEl = document.querySelector(".stage");
+  const fmtLen = (s) => `0:${String(Math.round(s)).padStart(2, "0")}`;
+  const slugOf = (b) => b.n.replace(/[^a-z0-9]+/g, "-");
+  function renderListen() {
+    const b = birdAt(state.view), s = SOUNDS[b.n];
+    if (!s) {
+      $("#listen").innerHTML = `<span class="quiet">${HUSH_IC}<span>${esc(QUIET[b.n] || "no recording yet")}</span></span>`;
+      $("#credit").textContent = "";
+      return;
+    }
+    const on = snd.for === b.n && !audio.paused;
+    $("#listen").innerHTML = `<button class="play" id="playBtn" aria-pressed="${on}" aria-label="${on ? "stop" : "play"} the ${esc(b.n)}'s ${esc(s.kind)}"><span class="pi">${on ? STOP_IC : PLAY_IC}</span><span>${on ? "listening" : `hear its ${esc(s.kind)}`}</span>${on ? `<span class="bars" aria-hidden="true"><i></i><i></i><i></i></span>` : `<span class="dim">${fmtLen(s.len)}</span>`}</button>`;
+    $("#credit").innerHTML = (snd.failed === b.n ? "that recording didn't load. tap play to try again · " : "") +
+      `recorded by <a href="${esc(s.page)}" target="_blank" rel="noopener">${esc(s.by)}</a> · ${esc(s.lic)} · ${esc(s.from)}`;
+  }
+  function setProgress() {
+    const btn = $("#playBtn");
+    if (btn && audio.duration) btn.style.setProperty("--p", `${((audio.currentTime / audio.duration) * 100).toFixed(1)}%`);
+  }
+  function progress() { setProgress(); if (!audio.paused) snd.raf = requestAnimationFrame(progress); }
+  audio.addEventListener("timeupdate", setProgress);
+  function setSinging(on) {
+    stageEl.classList.toggle("singing", on && !reduced);
+    setFx(on ? "notes" : fxFor(birdAt(state.view)));
+  }
+  audio.addEventListener("playing", () => { setSinging(true); renderListen(); cancelAnimationFrame(snd.raf); progress(); });
+  audio.addEventListener("pause", () => { cancelAnimationFrame(snd.raf); setSinging(false); renderListen(); });
+  audio.addEventListener("ended", () => { snd.for = null; renderListen(); });
+  audio.addEventListener("error", () => { if (snd.for) { snd.failed = snd.for; snd.for = null; setSinging(false); renderListen(); } });
+  function toggleSound() {
+    const b = birdAt(state.view);
+    if (!SOUNDS[b.n]) return;
+    if (snd.for === b.n && !audio.paused) { snd.for = null; audio.pause(); return; }
+    snd.for = b.n; snd.failed = null;
+    const url = new URL(`sounds/${slugOf(b)}.mp4`, location.href).href;
+    if (audio.src !== url) audio.src = url;
+    else audio.currentTime = 0;
+    audio.play().catch((e) => {
+      if (e && e.name === "AbortError") return;
+      if (snd.for === b.n) { snd.failed = b.n; snd.for = null; renderListen(); }
+    });
+    renderListen();
+  }
+  $("#listen").addEventListener("click", (e) => { if (e.target.closest("#playBtn")) toggleSound(); });
+
+  /* ---------- sheets ---------- */
+  let openSheet = null, returnFocus = null;
+  function showSheet(el, focusSel) {
+    returnFocus = document.activeElement;
+    el.hidden = false;
+    openSheet = el;
+    requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add("open")));
+    setTimeout(() => (el.querySelector(focusSel) || el.querySelector("[data-close].round"))?.focus({ preventScroll: true }), reduced ? 0 : 60);
+  }
+  function closeSheet() {
+    const el = openSheet; if (!el) return;
+    openSheet = null;
+    el.classList.remove("open");
+    setTimeout(() => { el.hidden = true; }, reduced ? 0 : 320);
+    returnFocus?.focus?.({ preventScroll: true });
+  }
+  document.querySelectorAll(".sheet-wrap").forEach((w) => w.addEventListener("click", (e) => { if (e.target.closest("[data-close]")) closeSheet(); }));
+
+  /* bird log: the next egg, the current bird, and the last week */
+  function renderLog() {
+    const cur = state.n, got = lifeCount();
+    $("#life").innerHTML = `<span>your life list</span><span class="bar"><i style="width:${((got / N) * 100).toFixed(1)}%"></i></span><span><b>${got}</b> of ${N}</span>`;
+    let h = `<div class="log-card next" aria-label="next bird, still hatching"><span class="mini">${eggSVG()}</span><span class="lw">next</span><b>still hatching</b><span class="count-s" id="nextCount"></span></div>`;
+    for (let n = cur; n >= cur - BACK; n--) {
+      const b = birdAt(n), seen = state.seen.has(n);
+      h += `<button class="log-card${n === state.view ? " sel" : ""}" data-n="${n}" aria-label="${esc(dayLabel(n, cur))} ${half(n)}: ${esc(b.n)}${seen ? ", spotted" : ""}"${n === state.view ? ' aria-current="true"' : ""}>
+        <span class="mini">${sceneSVG(b, { mini: true, flat: true })}</span>
+        <span class="lw${n === cur ? " now" : ""}">${esc(shortSlot(n, cur))}</span><b>${esc(b.n)}</b>
+        <small${seen ? ' class="got"' : ""}>${seen ? "spotted" : "missed"}</small>
+      </button>`;
+    }
+    $("#logList").innerHTML = h;
+    tick();
+  }
+  const openLog = () => { renderLog(); showSheet($("#logSheet"), ".log-card.sel"); };
+  $("#moreBtn").addEventListener("click", openLog);
+  $("#whenBtn").addEventListener("click", openLog);
+  $("#logList").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-n]"); if (!b) return;
+    const n = +b.dataset.n;
+    closeSheet();
+    setTimeout(() => go(n), reduced ? 0 : 200);
+  });
+
+  /* how it works */
+  $("#howBody").innerHTML = `
+    <p><b>a new bird lands every 12 hours,</b> at 12am and 12pm wherever you are. the countdown shows how long until the next one.</p>
+    <p><b>everyone gets the same bird</b> in the same half of the day, so you can compare notes with a friend.</p>
+    <p><b>${N} birds take turns,</b> from backyard robins to emperor penguins. once all ${N} have visited, they come back around with a different field note.</p>
+    <p><b>every sound is a real field recording</b> from xeno-canto or wikimedia commons, trimmed to about 10 seconds. the person who recorded it and its license show under each field note. sounds only play when you tap.</p>
+    <p><b>your life list</b> counts the birds you caught while they were here, like the list real birders keep. it's saved in this browser only.</p>
+    <p><b>the drawings are the crab's sketches,</b> not field guide plates. colors and shapes are close, not exact. sizes are typical adult lengths.</p>`;
+  $("#howBtn").addEventListener("click", () => showSheet($("#howSheet")));
+
+  /* ---------- add to home screen: android and chrome get the install prompt, everyone else gets steps ---------- */
+  const installBtn = $("#installBtn");
+  const glyph = (cls) => `<svg${cls ? ` class="${cls}"` : ""} viewBox="8 14 224 184" aria-hidden="true">${crabSVG({ flat: true })}</svg>`;
+  $("#installGlyph").innerHTML = glyph("app-glyph");
+  const installedApp = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  const isAndroid = /android/i.test(navigator.userAgent);
+  const isIOS = !isAndroid && (/iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
+  let installPrompt = null;
+  const updateInstall = () => { installBtn.hidden = installedApp(); };
+  window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installPrompt = e; updateInstall(); });
+  window.addEventListener("appinstalled", () => { installPrompt = null; updateInstall(); if (openSheet === $("#installSheet")) closeSheet(); });
+  updateInstall();
+  const SHARE_IC = `<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7.5 7.5 12 3l4.5 4.5M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg></span>`;
+  const PLUS_IC = `<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8.5v7M8.5 12h7"/></svg></span>`;
+  const MENU_IC = `<span class="ic"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5.5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="18.5" r="2"/></svg></span>`;
+  const INSTALL_IC = `<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M12 7.5v6M9.5 11l2.5 2.5 2.5-2.5M8 21h8"/></svg></span>`;
+  installBtn.addEventListener("click", async () => {
+    if (installPrompt) {
+      const p = installPrompt;
+      installPrompt = null;
+      p.prompt();
+      try { await p.userChoice; } catch (e) {}
+      updateInstall();
+      return;
+    }
+    const phone = isIOS || isAndroid;
+    const steps = isIOS
+      ? [`tap the share button ${SHARE_IC} in your browser's toolbar`, `scroll down and tap ${PLUS_IC} <b>add to home screen</b>`, `tap <b>add</b>. the crab lands on your home screen`]
+      : isAndroid
+        ? [`open your browser's menu ${MENU_IC}`, `tap <b>install app</b> or <b>add to home screen</b>`, `tap <b>install</b>. the crab lands on your home screen`]
+        : [`in chrome or edge, click the install icon ${INSTALL_IC} at the right end of the address bar`, `in safari on a mac, choose <b>file → add to dock</b>`, `or open this page on your phone and tap the crab`];
+    $("#installTitle").textContent = phone ? "put birdcrab on your phone" : "install birdcrab";
+    $("#installIcon").innerHTML = glyph();
+    $("#installSteps").innerHTML = steps.map((t) => `<li><span>${t}</span></li>`).join("");
+    const note = $("#installNote");
+    note.hidden = !framed;
+    note.textContent = "inside claude this saves a shortcut to this page.";
+    showSheet($("#installSheet"));
+  });
+
+  /* ---------- boot ---------- */
+  renderUnit();
+  markSeen();
+  render(true);
+  loop();
+})();
+</script>
