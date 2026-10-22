@@ -100,6 +100,21 @@ button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; bor
 .units button:hover { color: var(--ink); }
 .units button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
 
+/* your weather */
+.wx {
+  align-self: center; flex: none;
+  display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-width: 0;
+  margin-top: 4px; padding: 5px 13px 5px 9px; border-radius: 999px;
+  background: var(--chip); color: var(--ink); font-size: 13px;
+  transition: background-color .2s;
+}
+.wx:hover { background: var(--chip-hover); }
+.wx svg { width: 17px; height: 17px; flex: none; color: var(--muted); }
+.wx b { font-size: 15px; font-variant-numeric: tabular-nums; flex: none; }
+.wx span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.wx .dim { color: var(--muted); }
+.wx .hl { flex: none; color: var(--muted); font-variant-numeric: tabular-nums; }
+
 /* stage */
 .main { position: relative; flex: 1; display: flex; flex-direction: column; justify-content: center; }
 .stage { position: relative; flex: 1 1 0; min-height: 170px; max-height: 300px; display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; container-type: size; }
@@ -278,6 +293,7 @@ button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; bor
 .how { overflow-y: auto; min-height: 0; display: flex; flex-direction: column; gap: 12px; padding-bottom: 4px; }
 .how p { margin: 0; font-size: 14px; line-height: 21px; color: var(--muted); text-wrap: pretty; }
 .how b { color: var(--ink); }
+.how a { color: var(--ink); text-underline-offset: 2px; }
 
 .install-app { display: flex; align-items: center; gap: 14px; padding: 4px 2px; flex: none; }
 .install-app .icon { width: 60px; height: 60px; flex: none; border-radius: 14px; background: #ffffff; display: grid; place-items: center; overflow: hidden; }
@@ -339,6 +355,8 @@ button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; bor
       <button id="unitCm" aria-pressed="false" aria-label="centimeters">cm</button>
     </div>
   </header>
+
+  <button class="wx" id="wx" hidden></button>
 
   <section class="main" aria-label="this half-day's bird">
     <div class="stage" aria-hidden="true">
@@ -1186,7 +1204,7 @@ button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; bor
   /* ---------- state ---------- */
   const state = { n: slotOf(new Date()), view: 0, unit: saved.unit === "cm" ? "cm" : "in", seen: new Set(Array.isArray(saved.seen) ? saved.seen.filter(Number.isFinite) : []), activeHolder: $("#holderA") };
   state.view = state.n;
-  function persist() { store.set({ unit: state.unit, seen: [...state.seen].sort((a, b) => a - b).slice(-400) }); }
+  function persist() { store.set({ unit: state.unit, seen: [...state.seen].sort((a, b) => a - b).slice(-400), wx: wx.data, wxAsked: wx.asked }); }
   function markSeen() { if (!state.seen.has(state.n)) { state.seen.add(state.n); persist(); } }
   const lifeCount = () => new Set([...state.seen].map(birdIdx)).size;
 
@@ -1248,7 +1266,7 @@ button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; bor
     $("#unitIn").setAttribute("aria-pressed", state.unit === "in");
     $("#unitCm").setAttribute("aria-pressed", state.unit === "cm");
   }
-  function setUnit(u) { if (u === state.unit) return; state.unit = u; persist(); renderUnit(); renderChips(); }
+  function setUnit(u) { if (u === state.unit) return; state.unit = u; persist(); renderUnit(); renderChips(); renderWx(); }
   $("#unitIn").addEventListener("click", () => setUnit("in"));
   $("#unitCm").addEventListener("click", () => setUnit("cm"));
 
@@ -1283,6 +1301,9 @@ button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; bor
 
   /* ---------- fx: song notes, drifting feathers, snow ---------- */
   function fxFor(b) {
+    const w = wx.data && Date.now() - wx.data.at < 3 * 36e5 ? wxKind(wx.data.code, wx.data.day) : "";
+    if (w === "rain" || w === "storm") return "rain";
+    if (w === "snow") return "snow";
     const p = perchOf(b);
     if (p === "snow" || p === "ice") return "snow";
     if (["song", "parrot", "kingf", "hummer"].includes(b.a) && b.n !== "common raven") return "notes";
@@ -1304,6 +1325,9 @@ button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; bor
     } else if (fx.mode === "feathers") {
       p.x = fx.w * (.1 + Math.random() * .85); p.y = initial ? Math.random() * fx.h : -12;
       p.v = 9 + Math.random() * 9; p.ph = Math.random() * 6.28; p.len = 7 + Math.random() * 5;
+    } else if (fx.mode === "rain") {
+      p.x = Math.random() * (fx.w + fx.h * .12) - fx.h * .12; p.y = initial ? Math.random() * fx.h : -12;
+      p.v = 230 + Math.random() * 120; p.len = 7 + Math.random() * 6;
     } else {
       p.x = Math.random() * fx.w; p.y = initial ? Math.random() * fx.h : -8;
       p.v = 16 + Math.random() * 20; p.r = 1.2 + Math.random() * 1.8; p.ph = Math.random() * 6.28;
@@ -1315,7 +1339,7 @@ button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; bor
     if (mode === fx.mode) return;
     fx.mode = mode;
     sizeFx();
-    const count = mode === "notes" ? 4 : mode === "feathers" ? 5 : mode === "snow" ? 34 : 0;
+    const count = mode === "notes" ? 4 : mode === "feathers" ? 5 : mode === "snow" ? 34 : mode === "rain" ? 30 : 0;
     fx.parts = Array.from({ length: count }, () => spawn({}, true));
     if (mode && !fx.raf) { fx.last = performance.now(); fx.raf = requestAnimationFrame(frame); }
     if (!mode) fx.ctx.clearRect(0, 0, fx.w, fx.h);
@@ -1346,6 +1370,10 @@ button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; bor
         c.strokeStyle = "rgba(239,233,225,.5)"; c.lineWidth = 1; c.beginPath(); c.moveTo(-p.len - 3, 0); c.lineTo(p.len, 0); c.stroke();
         c.restore();
       }
+    } else if (fx.mode === "rain") {
+      c.strokeStyle = "rgba(160,195,230,.55)"; c.lineWidth = 1.5; c.lineCap = "round"; c.beginPath();
+      for (const p of fx.parts) { p.y += p.v * dt; p.x += p.v * dt * .12; if (p.y > fx.h + 10) spawn(p); c.moveTo(p.x, p.y); c.lineTo(p.x - p.len * .12, p.y - p.len); }
+      c.stroke();
     } else {
       c.fillStyle = "rgba(240,245,255,.85)";
       for (const p of fx.parts) {
@@ -1382,7 +1410,7 @@ button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; bor
       return;
     }
     const on = snd.for === b.n && !audio.paused;
-    $("#listen").innerHTML = `<button class="play" id="playBtn" aria-pressed="${on}" aria-label="${on ? "stop" : "play"} the ${esc(b.n)}'s ${esc(s.kind)}"><span class="pi">${on ? STOP_IC : PLAY_IC}</span><span>${on ? "listening" : `hear its ${esc(s.kind)}`}</span>${on ? `<span class="bars" aria-hidden="true"><i></i><i></i><i></i></span>` : `<span class="dim">${fmtLen(s.len)}</span>`}</button>`;
+    $("#listen").innerHTML = `<button class="play" id="playBtn" aria-pressed="${on}" aria-label="${on ? "stop" : "play"} the ${esc(b.n)}'s ${esc(s.kind || "recording")}"><span class="pi">${on ? STOP_IC : PLAY_IC}</span><span>${on ? "listening" : s.kind ? `hear its ${esc(s.kind)}` : "hear it"}</span>${on ? `<span class="bars" aria-hidden="true"><i></i><i></i><i></i></span>` : `<span class="dim">${fmtLen(s.len)}</span>`}</button>`;
     $("#credit").innerHTML = (snd.failed === b.n ? "that recording didn't load. tap play to try again · " : "") +
       `recorded by <a href="${esc(s.page)}" target="_blank" rel="noopener">${esc(s.by)}</a> · ${esc(s.lic)} · ${esc(s.from)}`;
   }
@@ -1466,6 +1494,7 @@ button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; bor
     <p><b>everyone gets the same bird</b> in the same half of the day, so you can compare notes with a friend.</p>
     <p><b>${N} birds take turns,</b> from backyard robins to emperor penguins. once all ${N} have visited, they come back around with a different field note.</p>
     <p><b>every sound is a real field recording</b> from xeno-canto or wikimedia commons, trimmed to about 10 seconds. the person who recorded it and its license show under each field note. sounds only play when you tap.</p>
+    <p><b>the weather is yours,</b> from <a href="https://open-meteo.com" target="_blank" rel="noopener">open-meteo</a>, for wherever your phone says you are. birdcrab asks for your location once. if you'd rather not share it, tap the weather pill and it'll use a rough guess from your internet connection instead. the in/cm switch also flips °f and °c.</p>
     <p><b>your life list</b> counts the birds you caught while they were here, like the list real birders keep. it's saved in this browser only.</p>
     <p><b>the drawings are the crab's sketches,</b> not field guide plates. colors and shapes are close, not exact. sizes are typical adult lengths.</p>`;
   $("#howBtn").addEventListener("click", () => showSheet($("#howSheet")));
@@ -1510,8 +1539,117 @@ button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; bor
     showSheet($("#installSheet"));
   });
 
+  /* ---------- your weather: open-meteo for wherever you are ----------
+     the browser asks for your location once. if you say no, nothing is looked up until you tap the pill,
+     which then uses a rough guess from your connection instead (bigdatacloud's free lookup). */
+  const WX_CODES = {
+    0: "clear", 1: "mostly clear", 2: "partly cloudy", 3: "overcast", 45: "fog", 48: "freezing fog",
+    51: "light drizzle", 53: "drizzle", 55: "heavy drizzle", 56: "freezing drizzle", 57: "freezing drizzle",
+    61: "light rain", 63: "rain", 65: "heavy rain", 66: "freezing rain", 67: "freezing rain",
+    71: "light snow", 73: "snow", 75: "heavy snow", 77: "snow grains",
+    80: "light showers", 81: "showers", 82: "heavy showers", 85: "snow showers", 86: "heavy snow showers",
+    95: "thunderstorm", 96: "thunderstorm & hail", 99: "thunderstorm & hail"
+  };
+  function wxKind(c, day) {
+    if (c >= 95) return "storm";
+    if ((c >= 71 && c <= 77) || c === 85 || c === 86) return "snow";
+    if ((c >= 51 && c <= 67) || (c >= 80 && c <= 82)) return "rain";
+    if (c === 45 || c === 48) return "fog";
+    if (c === 3) return "cloud";
+    if (c === 1 || c === 2) return day ? "partsun" : "partmoon";
+    return day ? "sun" : "moon";
+  }
+  const CLOUD = "M4.6 13h7.2a2.9 2.9 0 0 0 .3-5.8A4.1 4.1 0 0 0 4.3 8.2 2.4 2.4 0 0 0 4.6 13z";
+  const wxSvg = (inner) => `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
+  const WX_IC = {
+    sun: wxSvg('<circle cx="8" cy="8" r="3"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/>'),
+    moon: wxSvg('<path d="M12.8 10.2A5.3 5.3 0 0 1 5.8 3.2a5.3 5.3 0 1 0 7 7z"/>'),
+    partsun: wxSvg('<path d="M5.5 2v1M2 5.5h1M3 3l.7.7M8 3l-.7.7"/><path d="M3.6 7.4a2.3 2.3 0 0 1 3.9-2.1"/><path d="' + CLOUD + '"/>'),
+    partmoon: wxSvg('<path d="M7.6 4.6A2.6 2.6 0 0 1 4.2 2.1a2.6 2.6 0 0 0 1.4 4.9"/><path d="' + CLOUD + '"/>'),
+    cloud: wxSvg('<path d="' + CLOUD + '"/>'),
+    fog: wxSvg('<path d="M2.5 6h11M1.5 9h13M3.5 12h9"/>'),
+    rain: wxSvg('<path d="M4.6 10h7.2a2.9 2.9 0 0 0 .3-5.8A4.1 4.1 0 0 0 4.3 5.2 2.4 2.4 0 0 0 4.6 10z"/><path d="M5.5 12.2 5 14M8.5 12.2 8 14M11.5 12.2 11 14"/>'),
+    snow: wxSvg('<path d="M4.6 10h7.2a2.9 2.9 0 0 0 .3-5.8A4.1 4.1 0 0 0 4.3 5.2 2.4 2.4 0 0 0 4.6 10z"/><path d="M5.2 13h.1M8.2 14h.1M11.2 13h.1"/>'),
+    storm: wxSvg('<path d="M4.6 10h7.2a2.9 2.9 0 0 0 .3-5.8A4.1 4.1 0 0 0 4.3 5.2 2.4 2.4 0 0 0 4.6 10z"/><path d="M8.6 10.5 7 13h2l-1.4 2.2"/>')
+  };
+  const wx = { data: saved.wx && typeof saved.wx.t === "number" ? saved.wx : null, asked: !!saved.wxAsked, state: "idle" };
+  const temp = (c) => `${Math.round(state.unit === "cm" ? c : (c * 9) / 5 + 32)}°`;
+  async function getJSON(url, ms) {
+    const ac = new AbortController(), t = setTimeout(() => ac.abort(), ms);
+    try { const r = await fetch(url, { signal: ac.signal }); if (!r.ok) throw new Error("http " + r.status); return await r.json(); }
+    finally { clearTimeout(t); }
+  }
+  function preciseSpot() {
+    return new Promise((res) => {
+      if (!("geolocation" in navigator)) return res(null);
+      const give = setTimeout(() => res(null), 15000);
+      navigator.geolocation.getCurrentPosition(
+        (p) => { clearTimeout(give); res({ lat: p.coords.latitude, lon: p.coords.longitude }); },
+        (e) => { clearTimeout(give); res(e && e.code === 1 ? { denied: true } : null); },
+        { timeout: 10000, maximumAge: 6e5 }
+      );
+    });
+  }
+  async function roughSpot() {
+    try {
+      const r = await getJSON("https://api.bigdatacloud.net/data/reverse-geocode-client", 6000);
+      if (r.latitude != null && r.longitude != null) return { lat: r.latitude, lon: r.longitude, place: String(r.locality || r.city || "").toLowerCase(), rough: true };
+    } catch (e) {}
+    return null;
+  }
+  async function placeName(lat, lon) {
+    try {
+      const r = await getJSON(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`, 6000);
+      return String(r.locality || r.city || r.principalSubdivision || "").toLowerCase();
+    } catch (e) { return ""; }
+  }
+  function renderWx() {
+    const el = $("#wx");
+    if (wx.state === "hidden") { el.hidden = true; return; }
+    el.hidden = false;
+    const d = wx.data;
+    if (d && wx.state !== "off") {
+      const k = wxKind(d.code, d.day), cond = WX_CODES[d.code] || "";
+      el.innerHTML = `${WX_IC[k]}<b>${temp(d.t)}</b><span>${esc(cond)}${d.place ? `<span class="dim"> · ${esc(d.place)}</span>` : ""}</span><span class="hl">h ${temp(d.hi)} l ${temp(d.lo)}</span>`;
+      el.setAttribute("aria-label", `weather${d.place ? ` in ${d.place}` : ""}: ${temp(d.t)}, ${cond}, high ${temp(d.hi)}, low ${temp(d.lo)}. tap to refresh`);
+    } else if (wx.state === "loading") {
+      el.innerHTML = `${PIN}<span class="dim">finding your weather…</span>`;
+      el.setAttribute("aria-label", "finding your weather");
+    } else {
+      el.innerHTML = `${PIN}<span>show the weather where you are</span>`;
+      el.setAttribute("aria-label", "show the weather where you are");
+    }
+  }
+  async function loadWeather(tapped) {
+    if (wx.state === "loading") return;
+    wx.state = "loading"; renderWx();
+    let spot = await preciseSpot();
+    wx.asked = true;
+    if (spot && spot.denied) spot = tapped ? await roughSpot() : null;
+    else if (!spot) spot = await roughSpot();
+    if (!spot) { wx.state = wx.data ? "ok" : framed ? "hidden" : "off"; persist(); renderWx(); return; }
+    try {
+      const lat = spot.lat.toFixed(2), lon = spot.lon.toFixed(2);
+      const [r, place] = await Promise.all([
+        getJSON(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min&forecast_days=1&timezone=auto`, 8000),
+        spot.place ? spot.place : placeName(lat, lon)
+      ]);
+      wx.data = { t: r.current.temperature_2m, code: r.current.weather_code, day: !!r.current.is_day, hi: r.daily.temperature_2m_max[0], lo: r.daily.temperature_2m_min[0], place, at: Date.now() };
+      wx.state = "ok";
+      $("#live").textContent = `weather${place ? ` in ${place}` : ""}: ${temp(wx.data.t)}, ${WX_CODES[wx.data.code] || ""}`;
+    } catch (e) {
+      wx.state = wx.data ? "ok" : framed ? "hidden" : "off";
+    }
+    persist(); renderWx();
+    if (!(snd.for && !audio.paused)) setFx(fxFor(birdAt(state.view)));
+  }
+  $("#wx").addEventListener("click", () => loadWeather(true));
+  setInterval(() => { if (!document.hidden && wx.data && Date.now() - wx.data.at > 15 * 6e4) loadWeather(false); }, 6e4);
+
   /* ---------- boot ---------- */
   renderUnit();
+  if (wx.data) { wx.state = "ok"; renderWx(); }
+  if (!wx.asked || wx.data) loadWeather(false); else { wx.state = framed ? "hidden" : "off"; renderWx(); }
   markSeen();
   render(true);
   loop();

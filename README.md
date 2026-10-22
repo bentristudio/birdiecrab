@@ -7,10 +7,18 @@ It's a single static page with no build step and no server code.
 ## Files
 
 ```
-index.html     the whole app: markup, styles, drawings, bird data and script
-sounds/        69 short bird recordings (AAC audio in .mp4 files)
-README.md      this file, including credits for every recording
+index.html                 the whole app: markup, styles, drawings, bird data and script
+sounds/                    69 short bird recordings (AAC audio in .mp4 files)
+birds/                     a drawing of each bird, used by the iPhone widget
+scenes/                    each bird with the crab watching, used by the large widget
+birds.json                 the bird list and field notes, read by the widget
+widget/birdcrab-widget.js  the iPhone widget script, for the Scriptable app
+README.md                  this file, including credits for every recording
 ```
+
+## Your weather
+
+birdcrab shows the current weather where you are, from [Open-Meteo](https://open-meteo.com) (free, no key). The browser asks for your location once. If you say no, nothing is looked up until you tap the weather pill, which then uses a rough location from your internet connection ([BigDataCloud](https://www.bigdatacloud.com)'s free lookup). Rain and snow fall in the scene when it's raining or snowing where you are. The in/cm switch also flips °F and °C.
 
 ## Run it locally
 
@@ -28,6 +36,21 @@ Then visit http://localhost:8000.
 2. In the repository, go to **Settings → Pages**.
 3. Under **Build and deployment**, pick **Deploy from a branch**, choose your main branch and the `/ (root)` folder, and save.
 4. The site appears at `https://<your-username>.github.io/<repository-name>/` after a minute or two.
+
+## iPhone home screen widget
+
+The widget shows the current bird, a live countdown to the next one and your weather. It comes in small, medium and large sizes, plus lock screen versions. It runs in [Scriptable](https://apps.apple.com/app/scriptable/id1405459188), a free app that runs widget scripts.
+
+1. Install **Scriptable** from the App Store.
+2. Open `widget/birdcrab-widget.js` and copy all of it.
+3. In Scriptable, tap **+**, paste the script, and rename it **birdcrab** (tap the title at the top).
+4. Change the `SITE` line near the top to your birdcrab address, with no slash at the end, for example `const SITE = "https://birdcrab.vercel.app";`.
+5. Tap ▶ to run it once. Allow location when asked, so the widget can show your weather.
+6. Go to your home screen, long-press an empty spot, tap **Edit → Add Widget**, pick **Scriptable**, choose a size and add it.
+7. Long-press the new widget, tap **Edit Widget**, and set **Script** to **birdcrab**. Set **When Interacting** to **Open URL** so tapping it opens birdcrab.
+8. For °C, type `c` in the widget's **Parameter** field.
+
+The countdown ticks live. iOS decides how often widgets refresh, usually every 15–30 minutes, and the script asks for a refresh right when the next bird lands. Lock screen widgets work the same way: add a Scriptable widget to the lock screen and pick the birdcrab script.
 
 ## Sound credits and licenses
 
@@ -108,4 +131,4 @@ Every sound is a real field recording. Each clip was trimmed to about 10 seconds
 | killdeer | Jonathon Jongsma | [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0) | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Charadrius_vociferus_-_Killdeer_XC62728.mp3) |
 | mourning dove | Jonathon Jongsma | [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0) | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Zenaida_macroura_-_Mourning_Dove_XC128006.ogg) |
 
-Bird drawings, field notes and code: the crab's own sketches. Colors and shapes are close, not field-guide exact.
+Weather data by [Open-Meteo](https://open-meteo.com) (CC BY 4.0). Bird drawings, field notes and code: the crab's own sketches. Colors and shapes are close, not field-guide exact.
